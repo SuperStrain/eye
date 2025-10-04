@@ -84,7 +84,7 @@ file(GLOB_RECURSE THIRD_PARTY_SOS
 
 # 排除芯片库目录
 set(FILTERED_SOS "")
-foreach(lib ${ALL_SOS})
+foreach(lib ${THIRD_PARTY_SOS})
     if(NOT lib MATCHES ".*/hi3516cv610_mpp/.*")
         list(APPEND FILTERED_SOS ${lib})
     endif()
