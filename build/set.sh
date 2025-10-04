@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-TOOLCHAIN_FILE="$SCRIPT_DIR/../toolchain/toolchain-arm-v01c02.cmake"
+TOOLCHAIN_FILE="$SCRIPT_DIR/../cmake/toolchain-arm-v01c02.cmake"
 
 cd "$SCRIPT_DIR"
 
