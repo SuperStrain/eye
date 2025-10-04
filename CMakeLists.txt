@@ -41,7 +41,10 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     message(FATAL_ERROR "Please use -DCMAKE_TOOLCHAIN_FILE=./aarch64-none-linux-gnu-toolchain.cmake")
 endif()
 
+set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
 set (target_out ${PROJECT_NAME})
+set (THIRDPARTY_LIB zlog)
+ 
 file(GLOB_RECURSE DIR_SRCS "./source/*.c" "./source/*.cpp")
 
 add_executable(${target_out} ${DIR_SRCS})
@@ -50,18 +53,18 @@ target_include_directories(
     ${target_out}
     PRIVATE
     ./include
-    # ${OPENCV_INCLUDE_DIR}
+    ${THIRDPARTY}/zlog/include
 )
 
 target_link_directories(
     ${target_out}
     PRIVATE
-    # ${OPENCV_LIB_DIR}
+    ${THIRDPARTY}/zlog/lib
 )
 
 target_link_libraries(${target_out} PRIVATE
     pthread
-    # ${OPENCV_LIB}
+    ${THIRDPARTY_LIB}
 )
 
 # ------------------------------------------------------------------
@@ -76,6 +79,11 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   endif()
   set(CMAKE_INSTALL_PREFIX "${default_install_dir}" CACHE PATH "Default install path" FORCE)
 endif()
+
+install(CODE [[
+    message(STATUS "准备清理安装目录：${CMAKE_INSTALL_PREFIX}")
+    file(REMOVE_RECURSE "${CMAKE_INSTALL_PREFIX}")
+]])
 
 # 递归查找 thirdparty 下所有 .so 文件，包括版本号
 file(GLOB_RECURSE THIRD_PARTY_SOS
@@ -97,6 +105,8 @@ install (TARGETS ${target_out}
          RUNTIME DESTINATION bin
         #  LIBRARY DESTINATION lib
          )
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/conf/ DESTINATION conf)
 
 message(STATUS "C flags: ${CMAKE_C_FLAGS}")
 message(STATUS "CXX flags: ${CMAKE_CXX_FLAGS}")
