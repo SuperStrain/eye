@@ -8,12 +8,53 @@ extern "C" {
 #include <zlog.h>
 }
 
-#define LOGGER_DEBUG(cat, fmt, ...) loggerSpace::CategoryLogger::instance().debug(#cat, fmt, ##__VA_ARGS__)
-#define LOGGER_INFO(cat, fmt, ...)  loggerSpace::CategoryLogger::instance().info(#cat, fmt, ##__VA_ARGS__)
-#define LOGGER_NOTICE(cat, fmt, ...)  loggerSpace::CategoryLogger::instance().notice(#cat, fmt, ##__VA_ARGS__)
-#define LOGGER_WARN(cat, fmt, ...)  loggerSpace::CategoryLogger::instance().warn(#cat, fmt, ##__VA_ARGS__)
-#define LOGGER_ERROR(cat, fmt, ...) loggerSpace::CategoryLogger::instance().error(#cat, fmt, ##__VA_ARGS__)
-#define LOGGER_FATAL(cat, fmt, ...) loggerSpace::CategoryLogger::instance().fatal(#cat, fmt, ##__VA_ARGS__)
+#define LOGGER_DEBUG(cat, fmt, ...)                                   \
+    do {                                                              \
+        zlog_category_t* __logger_cat_tmp =                           \
+            loggerSpace::Logger::instance().get_category((#cat));     \
+        if (__logger_cat_tmp)                                         \
+            zlog_debug(__logger_cat_tmp, (fmt), ##__VA_ARGS__);       \
+    } while (0)
+
+#define LOGGER_INFO(cat, fmt, ...)                                    \
+    do {                                                              \
+        zlog_category_t* __logger_cat_tmp =                           \
+            loggerSpace::Logger::instance().get_category((#cat));     \
+        if (__logger_cat_tmp)                                         \
+            zlog_info(__logger_cat_tmp, (fmt), ##__VA_ARGS__);        \
+    } while (0)
+
+#define LOGGER_NOTICE(cat, fmt, ...)                                  \
+    do {                                                              \
+        zlog_category_t* __logger_cat_tmp =                           \
+            loggerSpace::Logger::instance().get_category((#cat));     \
+        if (__logger_cat_tmp)                                         \
+            zlog_notice(__logger_cat_tmp, (fmt), ##__VA_ARGS__);      \
+    } while (0)
+
+#define LOGGER_WARN(cat, fmt, ...)                                    \
+    do {                                                              \
+        zlog_category_t* __logger_cat_tmp =                           \
+            loggerSpace::Logger::instance().get_category((#cat));     \
+        if (__logger_cat_tmp)                                         \
+            zlog_warn(__logger_cat_tmp, (fmt), ##__VA_ARGS__);        \
+    } while (0)
+
+#define LOGGER_ERROR(cat, fmt, ...)                                   \
+    do {                                                              \
+        zlog_category_t* __logger_cat_tmp =                           \
+            loggerSpace::Logger::instance().get_category((#cat));     \
+        if (__logger_cat_tmp)                                         \
+            zlog_error(__logger_cat_tmp, (fmt), ##__VA_ARGS__);       \
+    } while (0)
+
+#define LOGGER_FATAL(cat, fmt, ...)                                   \
+    do {                                                              \
+        zlog_category_t* __logger_cat_tmp =                           \
+            loggerSpace::Logger::instance().get_category((#cat));     \
+        if (__logger_cat_tmp)                                         \
+            zlog_fatal(__logger_cat_tmp, (fmt), ##__VA_ARGS__);       \
+    } while (0)
 
 namespace loggerSpace {
 
@@ -54,60 +95,6 @@ private:
 private:
     static constexpr const char* CONFIG_FILE = "/app/conf/zlog.conf";
     static constexpr const char* LOG_DIR = "/data/eyeLog";
-};
-
-class CategoryLogger {
-public:
-    static CategoryLogger &instance() {
-        static CategoryLogger inst;
-        return inst;
-    }
-
-    CategoryLogger(const CategoryLogger&) = delete;
-
-    CategoryLogger &operator=(const CategoryLogger&) = delete;
-
-    template <typename... Args>
-    void debug(const char* category, const char* fmt, Args... args) {
-        zlog_category_t* cat = Logger::instance().get_category(category);
-        if (cat) zlog_debug(cat, fmt, args...);
-    }
-
-    template <typename... Args>
-    void info(const char* category, const char* fmt, Args... args) {
-        zlog_category_t* cat = Logger::instance().get_category(category);
-        if (cat) zlog_info(cat, fmt, args...);
-    }
-
-    template <typename... Args>
-    void notice(const char* category, const char* fmt, Args... args) {
-        zlog_category_t* cat = Logger::instance().get_category(category);
-        if (cat) zlog_notice(cat, fmt, args...);
-    }
-
-    template <typename... Args>
-    void warn(const char* category, const char* fmt, Args... args) {
-        zlog_category_t* cat = Logger::instance().get_category(category);
-        if (cat) zlog_warn(cat, fmt, args...);
-    }
-
-    template <typename... Args>
-    void error(const char* category, const char* fmt, Args... args) {
-        zlog_category_t* cat = Logger::instance().get_category(category);
-        if (cat) zlog_error(cat, fmt, args...);
-    }
-
-    template <typename... Args>
-    void fatal(const char* category, const char* fmt, Args... args) {
-        zlog_category_t* cat = Logger::instance().get_category(category);
-        if (cat) zlog_fatal(cat, fmt, args...);
-    }
-
-private:
-
-    CategoryLogger(){};
-
-    ~CategoryLogger(){};
 };
 
 }
