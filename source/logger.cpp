@@ -9,7 +9,7 @@ void loggerSpace::Logger::log_printf(const char* log)
 
 loggerSpace::Logger::Logger() : initialized_(false)
 {
-
+    stop_flag_.store(true);
 }
 
 loggerSpace::Logger::~Logger()
@@ -36,6 +36,10 @@ bool loggerSpace::Logger::init() noexcept
         return false;        
     }
     initialized_ = true;
+
+    stop_flag_.store(false);
+    check_config_thread_ = std::thread(&loggerSpace::Logger::check_config_task, this);
+
     char logBuff[128] = {0};
     snprintf(logBuff, sizeof(logBuff), "Logger initialize success! zlog version : %s", zlog_version());
     log_printf(logBuff);
@@ -53,6 +57,10 @@ void loggerSpace::Logger::fini() noexcept
 
     zlog_fini();
     initialized_ = false;
+
+    stop_flag_.store(true);
+    if(check_config_thread_.joinable())
+        check_config_thread_.join();
 }
 
 bool loggerSpace::Logger::initialized() const
@@ -91,4 +99,28 @@ zlog_category_t * loggerSpace::Logger::get_category(const char * cat) {
     zlog_category_t *zc = zlog_get_category(cat);
     if (zc) cats_.emplace(cat, zc);
     return zc;
+}
+
+int loggerSpace::Logger::reload_log_config()
+{
+    if (zlog_reload(CONFIG_FILE) != 0)
+    {
+        log_printf("log config reload fail!");
+        return -1;
+    }
+    return 0;
+}
+
+int loggerSpace::Logger::check_config_task()
+{
+    while(!stop_flag_.load())
+    {
+        if(access(UPDATE_FILE, F_OK) == 0)
+        {
+            reload_log_config();
+            remove(UPDATE_FILE);
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    return 0;
 }
