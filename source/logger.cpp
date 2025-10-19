@@ -2,7 +2,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-void loggerSpace::Logger::logPrintf(const char* log)
+void loggerSpace::Logger::log_printf(const char* log)
 {
     printf("[zlog] %s\n", log);
 }
@@ -25,20 +25,20 @@ bool loggerSpace::Logger::init() noexcept
 
     if(initialized_)
     {
-        logPrintf("Logger has initialized");
+        log_printf("Logger has initialized");
         return false;
     }
 
     if(zlog_init(CONFIG_FILE) != 0)
     {
-        logPrintf("Logger initialize fail!");
+        log_printf("Logger initialize fail!");
         initialized_ = false;
         return false;        
     }
     initialized_ = true;
     char logBuff[128] = {0};
     snprintf(logBuff, sizeof(logBuff), "Logger initialize success! zlog version : %s", zlog_version());
-    logPrintf(logBuff);
+    log_printf(logBuff);
 
     return true;
 }
@@ -47,7 +47,7 @@ void loggerSpace::Logger::fini() noexcept
 {
     if(!initialized_)
     {
-        logPrintf("Logger has fini");
+        log_printf("Logger fini");
         return ;
     }
 
@@ -64,7 +64,7 @@ bool loggerSpace::Logger::initialized() const
 zlog_category_t * loggerSpace::Logger::get_category(const std::string &cat) {
     if (!initialized_)
     {
-        logPrintf("Logger not initialize");
+        log_printf("Logger not initialize");
         return nullptr;
     }
     auto it = cats_.find(cat);
@@ -77,12 +77,12 @@ zlog_category_t * loggerSpace::Logger::get_category(const std::string &cat) {
 zlog_category_t * loggerSpace::Logger::get_category(const char * cat) {
     if (!initialized_)
     {
-        logPrintf("Logger not initialize");
+        log_printf("Logger not initialize");
         return nullptr;
     }
     if(!cat)
     {
-        logPrintf("cat is null");
+        log_printf("cat is null");
         return nullptr;        
     }
 
