@@ -43,7 +43,15 @@ endif()
 
 set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
 set (target_out ${PROJECT_NAME})
-set (THIRDPARTY_LIB zlog)
+set(HI_MPP_LIB
+    ss_mpi_sysmem
+    ss_mpi
+    )
+set (THIRDPARTY_LIB
+    securec
+    ${HI_MPP_LIB}
+    zlog
+    )
  
 file(GLOB_RECURSE DIR_SRCS "./source/*.c" "./source/*.cpp")
 
@@ -54,12 +62,14 @@ target_include_directories(
     PRIVATE
     ./include
     ${THIRDPARTY}/zlog/include
+    ${THIRDPARTY}/hi3516cv610_mpp/include
 )
 
 target_link_directories(
     ${target_out}
     PRIVATE
     ${THIRDPARTY}/zlog/lib
+    ${THIRDPARTY}/hi3516cv610_mpp/lib
 )
 
 target_link_libraries(${target_out} PRIVATE
