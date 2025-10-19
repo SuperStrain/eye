@@ -82,7 +82,7 @@ public:
 
 private:
 
-    void logPrintf(const char* log);
+    void log_printf(const char* log);
 
     Logger();
 
