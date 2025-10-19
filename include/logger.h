@@ -3,6 +3,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <thread>
+#include <atomic>
 
 extern "C" {
 #include <zlog.h>
@@ -88,12 +90,19 @@ private:
 
     ~Logger();
 
+    int reload_log_config();
+
+    int check_config_task();
+
 private:
     bool initialized_;
     std::unordered_map<std::string, zlog_category_t*> cats_;
+    std::thread check_config_thread_;
+    std::atomic<bool> stop_flag_;
 
 private:
     static constexpr const char* CONFIG_FILE = "/app/conf/zlog.conf";
+    static constexpr const char* UPDATE_FILE = "/app/conf/logupdate";
     static constexpr const char* LOG_DIR = "/data/eyeLog";
 };
 
