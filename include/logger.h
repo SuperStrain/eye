@@ -10,6 +10,11 @@ extern "C" {
 #include <zlog.h>
 }
 
+enum LogCategory {
+    LOG_CAT_HIMPP,
+    LOG_CAT_MAX
+};
+
 #define LOGGER_DEBUG(cat, fmt, ...)                                   \
     do {                                                              \
         zlog_category_t* __logger_cat_tmp =                           \
