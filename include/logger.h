@@ -11,8 +11,8 @@ extern "C" {
 }
 
 enum LogCategory {
-    LOG_CAT_HIMPP,
-    LOG_CAT_MAX
+    HIMPP,
+    LOG_MAX
 };
 
 #define LOGGER_DEBUG(cat, fmt, ...)                                   \
