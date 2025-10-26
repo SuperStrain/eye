@@ -2,6 +2,7 @@
 #include <vector>
 #include <csignal>
 #include <unistd.h>
+#include "video_process_hi.h"
 
 void signal_handler(int sig) {
     std::cout << "Signal " << sig << " received" << std::endl;
@@ -12,6 +13,8 @@ int main() {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     std::signal(SIGHUP, signal_handler);
+
+    videoProcessHi::getInstance().init();
 
     pause();
 
