@@ -5,10 +5,8 @@
 #include <unordered_map>
 #include <thread>
 #include <atomic>
-
-extern "C" {
 #include <zlog.h>
-}
+
 
 enum LogCategory {
     HIMPP,
