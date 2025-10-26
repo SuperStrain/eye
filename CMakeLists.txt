@@ -46,6 +46,16 @@ set (target_out ${PROJECT_NAME})
 set(HI_MPP_LIB
     ss_mpi_sysmem
     ss_mpi
+    ir_auto
+    dehaze
+    acs
+    drc
+    ldci
+    bnr
+    calcflicker
+    extend_stats
+    ot_mpi_isp
+    ss_mpi_isp
     )
 set (THIRDPARTY_LIB
     securec
