@@ -1,5 +1,5 @@
 #include "video_process_hi.h"
-#include "securec.h"
+#include <securec.h>
 #include <ot_common_sys.h>
 #include <ss_mpi_sys.h>
 #include <ot_common_vb.h>
@@ -11,6 +11,12 @@
 #include <ss_mpi_vi.h>
 #include <ot_common_isp.h>
 #include <ss_mpi_isp.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <ot_mipi_rx.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), video_stretch_enable(true)
 {
@@ -254,7 +260,7 @@ td_s32 videoProcessHi::init_vi_module(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_
     }
     
     // init vi process: vi enable dev, bind-create-start pipe, enable chn
-    s32Ret = init_vi_process(ViVpssMode, ViPipe);
+    s32Ret = init_vi_process(ViVpssMode, ViDev, ViPipe);
     if(s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "Init VI err for %#x!", s32Ret);
         return s32Ret;
@@ -263,7 +269,7 @@ td_s32 videoProcessHi::init_vi_module(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_
     return TD_SUCCESS;
 }
 
-td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_pipe ViPipe)
+td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_dev ViDev, ot_vi_pipe ViPipe)
 {
     td_s32              s32Ret;
     ot_isp_ctrl_param   stIspCtrlParam;
@@ -275,5 +281,187 @@ td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_pi
         LOGGER_ERROR(HIMPP, "mpi isp get ctrl_param failed with %d!", s32Ret);
         return s32Ret;
     }
+
+    stIspCtrlParam.stat_interval  = SENSOR_FRAME_RATE/30;
+    s32Ret = ss_mpi_isp_set_ctrl_param(ViPipe, &stIspCtrlParam);
+    if (TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "mpi isp set ctrl_param failed with %d!", s32Ret);
+        return s32Ret;
+    }
+
+    // start vi pipe
+    s32Ret = comm_vi_start_vi(ViDev, ViPipe);
+    if (TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "comm_vi_start_vi failed with %d!", s32Ret);
+        return s32Ret;
+    }
+
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe)
+{
+    td_s32 s32Ret;
+
+    // 1.init mipi
+    s32Ret = comm_vi_start_mipi();
+    if(TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "comm_vi_start_mipi failed with %d!", s32Ret);
+        return s32Ret;
+    }
+
+    // enable start vi pipe and channel
+    s32Ret = comm_vi_create_vi(ViDev, ViPipe);
+    if(TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "comm_vi_create_vi failed with %d!", s32Ret);
+        return s32Ret;
+    }
+
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::comm_vi_start_mipi()
+{
+    td_s32 s32Ret;
+    td_s32 fd;
+    combo_dev_t devno = 0;
+    sns_clk_source_t snsDev = 0;
+    combo_dev_attr_t stcomboDevAttr;
+
+    lane_divide_mode_t lane_divide_mode = LANE_DIVIDE_MODE_0;
+    fd = open(MIPI_DEV_NODE, O_RDWR);
+    if(fd < 0) {
+        LOGGER_ERROR(HIMPP, "open %s failed!", MIPI_DEV_NODE);
+        return TD_FAILURE;
+    }
+
+    // set mipi hs mode
+    s32Ret = ioctl(fd, OT_MIPI_SET_HS_MODE, &lane_divide_mode);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_HS_MODE failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    // enable mipi clock
+    s32Ret = ioctl(fd, OT_MIPI_ENABLE_MIPI_CLOCK, &devno);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_ENABLE_MIPI_CLOCK failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    // reset mipi
+    s32Ret = ioctl(fd, OT_MIPI_RESET_MIPI, &devno);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_RESET_MIPI failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    // enable sensor clock
+    s32Ret = ioctl(fd, OT_MIPI_ENABLE_SENSOR_CLOCK, &snsDev);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_ENABLE_SENSOR_CLOCK failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    // reset sensor
+    s32Ret = ioctl(fd, OT_MIPI_RESET_SENSOR, &snsDev);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_RESET_SENSOR failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+    
+    // set mipi dev attr (SC4336P)
+    stcomboDevAttr.devno = devno;
+    stcomboDevAttr.input_mode = INPUT_MODE_MIPI;
+    stcomboDevAttr.data_rate = MIPI_DATA_RATE_X1;
+    stcomboDevAttr.img_rect = {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT};
+    stcomboDevAttr.mipi_attr = {
+        DATA_TYPE_RAW_10BIT,
+        OT_MIPI_WDR_MODE_NONE,
+    };
+    s32Ret = ioctl(fd, OT_MIPI_SET_DEV_ATTR, &stcomboDevAttr);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_DEV_ATTR failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    // unreset mipi
+    s32Ret = ioctl(fd, OT_MIPI_UNRESET_MIPI, &devno);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_UNRESET_MIPI failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    // unreset sensor
+    s32Ret = ioctl(fd, OT_MIPI_UNRESET_SENSOR, &snsDev);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_UNRESET_SENSOR failed with %#x", s32Ret);
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    close(fd);
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe)
+{
+    td_s32 s32Ret;
+    ot_vi_dev_attr stViDevAttr = {
+        .intf_mode = OT_VI_INTF_MODE_MIPI,
+        .work_mode = OT_VI_WORK_MODE_MULTIPLEX_1,
+        .scan_mode = OT_VI_SCAN_PROGRESSIVE,
+        .ad_chn_id = { -1, -1, -1, -1 },
+        .data_seq = OT_VI_DATA_SEQ_YUYV,
+        .sync_cfg = {
+            .vsync = OT_VI_VSYNC_PULSE,
+            .vsync_neg = OT_VI_VSYNC_NEG_HIGH,
+            .hsync = OT_VI_HSYNC_PULSE,
+            .hsync_neg = OT_VI_HSYNC_NEG_HIGH,
+            .vsync_valid = OT_VI_VSYNC_NORM_PULSE,
+            .vsync_valid_neg = OT_VI_VSYNC_VALID_NEG_HIGH,
+            .timing_blank = {0, SENSOR_MAX_WIDTH, 0, 0, SENSOR_MAX_HRIGHT, 0, 0, 0, 0}
+        },
+        .data_type = OT_VI_DATA_TYPE_RAW,
+        .data_reverse = TD_FALSE,
+        .in_size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
+        .data_rate = OT_DATA_RATE_X1
+    };
+    ot_vi_bind_pipe  stDevBindPipe = {0};
+
+    // vi enable dev
+    s32Ret = ss_mpi_vi_set_dev_attr(ViDev, &stViDevAttr);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ss_mpi_vi_set_dev_attr failed with %#x", s32Ret);
+        return s32Ret;
+    }
+
+    s32Ret = ss_mpi_vi_enable_dev(ViDev);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ss_mpi_vi_enable_dev failed with %#x", s32Ret);
+        return s32Ret;
+    }
+
+    // vi bind dev to pipe interface 单sensor
+    s32Ret = ss_mpi_vi_bind(ViDev, ViPipe);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ss_mpi_vi_bind failed with %#x", s32Ret);
+        return s32Ret;
+    }
+
+    // create vi pipe, then start it
+
+
     return TD_SUCCESS;
 }

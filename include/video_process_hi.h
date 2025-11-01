@@ -40,7 +40,13 @@ private:
 
     td_s32 init_vi_module(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn);
 
-    td_s32 init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_pipe ViPipe);
+    td_s32 init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_dev ViDev, ot_vi_pipe ViPipe);
+
+    td_s32 comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe);
+
+    td_s32 comm_vi_start_mipi();
+
+    td_s32 comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe);
 
 private:
 
@@ -50,6 +56,10 @@ private:
     static constexpr const int VI_HEIGHT = 1080;
 	static constexpr const int IVP_SMD_W = 640;
 	static constexpr const int IVP_SMD_H = 384;
+    static constexpr const int SENSOR_MAX_WIDTH = 2560;
+    static constexpr const int SENSOR_MAX_HRIGHT = 1440;
+    static constexpr const int SENSOR_FRAME_RATE = 30;
+    static constexpr const char* MIPI_DEV_NODE = "/dev/ot_mipi_rx";
 
     bool wrap_enable;   // 低延时卷绕模式，300w和400w分辨率时使用
     bool video_stretch_enable;  // 200W拉伸为300W
