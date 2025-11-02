@@ -260,7 +260,7 @@ td_s32 videoProcessHi::init_vi_module(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_
     }
     
     // init vi process: vi enable dev, bind-create-start pipe, enable chn
-    s32Ret = init_vi_process(ViVpssMode, ViDev, ViPipe);
+    s32Ret = init_vi_process(ViVpssMode, ViDev, ViPipe, ViChn);
     if(s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "Init VI err for %#x!", s32Ret);
         return s32Ret;
@@ -269,7 +269,7 @@ td_s32 videoProcessHi::init_vi_module(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_
     return TD_SUCCESS;
 }
 
-td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_dev ViDev, ot_vi_pipe ViPipe)
+td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn)
 {
     td_s32              s32Ret;
     ot_isp_ctrl_param   stIspCtrlParam;
@@ -291,7 +291,7 @@ td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_de
     }
 
     // start vi pipe
-    s32Ret = comm_vi_start_vi(ViDev, ViPipe);
+    s32Ret = comm_vi_start_vi(ViDev, ViPipe, ViChn);
     if (TD_SUCCESS != s32Ret)
     {
         LOGGER_ERROR(HIMPP, "comm_vi_start_vi failed with %d!", s32Ret);
@@ -301,7 +301,7 @@ td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_de
     return TD_SUCCESS;
 }
 
-td_s32 videoProcessHi::comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe)
+td_s32 videoProcessHi::comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn)
 {
     td_s32 s32Ret;
 
@@ -314,10 +314,17 @@ td_s32 videoProcessHi::comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe)
     }
 
     // enable start vi pipe and channel
-    s32Ret = comm_vi_create_vi(ViDev, ViPipe);
+    s32Ret = comm_vi_create_vi(ViDev, ViPipe, ViChn);
     if(TD_SUCCESS != s32Ret)
     {
         LOGGER_ERROR(HIMPP, "comm_vi_create_vi failed with %d!", s32Ret);
+        return s32Ret;
+    }
+
+    s32Ret = comm_vi_create_isp();
+    if(TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "comm_vi_create_isp failed with %d!", s32Ret);
         return s32Ret;
     }
 
@@ -415,7 +422,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     return TD_SUCCESS;
 }
 
-td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe)
+td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn)
 {
     td_s32 s32Ret;
     ot_vi_dev_attr stViDevAttr = {
@@ -438,7 +445,28 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe)
         .in_size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
         .data_rate = OT_DATA_RATE_X1
     };
-    ot_vi_bind_pipe  stDevBindPipe = {0};
+    // ot_vi_bind_pipe  stDevBindPipe = {};
+    ot_vi_pipe_attr  stPipeAttr = {
+        .pipe_bypass_mode = OT_VI_PIPE_BYPASS_NONE,
+        .isp_bypass = TD_FALSE,
+        .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
+        .pixel_format = OT_PIXEL_FORMAT_RGB_BAYER_10BPP,
+        .compress_mode = OT_COMPRESS_MODE_NONE,
+        .frame_rate_ctrl = {-1, -1}
+    };
+
+    ot_vi_chn_attr stChnAttr = {
+        .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
+        .pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420,
+        .dynamic_range = OT_DYNAMIC_RANGE_SDR8,
+        .video_format = OT_VIDEO_FORMAT_LINEAR,
+        .compress_mode = OT_COMPRESS_MODE_NONE,
+        .mirror_en = TD_FALSE,
+        .flip_en = TD_FALSE,
+        .depth = 0,
+        .frame_rate_ctrl = {-1, -1}
+    };
+    ot_3dnr_attr dnr_attr = {};
 
     // vi enable dev
     s32Ret = ss_mpi_vi_set_dev_attr(ViDev, &stViDevAttr);
@@ -461,7 +489,53 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe)
     }
 
     // create vi pipe, then start it
+    s32Ret = ss_mpi_vi_create_pipe(ViDev, &stPipeAttr);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ss_mpi_vi_create_pipe failed with %#x", s32Ret);
+        return s32Ret;
+    }
 
+    // start vi pipe
+    s32Ret = ss_mpi_vi_start_pipe(ViPipe);
+    if (s32Ret != TD_SUCCESS)
+    {
+        ss_mpi_vi_destroy_pipe(ViPipe);
+        LOGGER_ERROR(HIMPP, "ss_mpi_vi_start_pipe failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+    
+    // enable vi channel
+    s32Ret = ss_mpi_vi_set_chn_attr(ViPipe, ViChn, &stChnAttr);
+    if (s32Ret != TD_SUCCESS)
+    {
+        ss_mpi_vi_destroy_pipe(ViPipe);
+        LOGGER_ERROR(HIMPP, "ss_mpi_vi_start_pipe failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+    
+    // s32Ret = ss_mpi_vi_enable_chn(ViPipe, ViChn);
+    // if (s32Ret != TD_SUCCESS)
+    // {
+    //     LOGGER_ERROR(HIMPP, "vi enable chn failed with %#x!\n", s32Ret);
+    //     return s32Ret;
+    // }
 
+    ss_mpi_vi_get_pipe_3dnr_attr(ViPipe, &dnr_attr);
+    
+    dnr_attr.enable = TD_TRUE;
+    dnr_attr.compress_mode = OT_COMPRESS_MODE_FRAME;
+    s32Ret = ss_mpi_vi_set_pipe_3dnr_attr(ViPipe, &dnr_attr);
+    if (s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP,"vi pipe(%d) set 3dnr_attr failed!", ViPipe);
+        return s32Ret;
+    }
+
+    // fail to StopViPipe , StopDev
+
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::comm_vi_create_isp()
+{
     return TD_SUCCESS;
 }

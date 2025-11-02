@@ -40,13 +40,15 @@ private:
 
     td_s32 init_vi_module(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn);
 
-    td_s32 init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_dev ViDev, ot_vi_pipe ViPipe);
+    td_s32 init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn);
 
-    td_s32 comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe);
+    td_s32 comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn);
 
     td_s32 comm_vi_start_mipi();
 
-    td_s32 comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe);
+    td_s32 comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn);
+
+    td_s32 comm_vi_create_isp();
 
 private:
 
