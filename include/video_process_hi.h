@@ -3,6 +3,7 @@
 
 #include <ot_common_vpss.h>
 #include <ot_type.h>
+#include <thread>
 
 class videoProcessHi
 {
@@ -48,7 +49,11 @@ private:
 
     td_s32 comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn);
 
-    td_s32 comm_vi_create_isp();
+    td_s32 comm_vi_create_isp(ot_vi_pipe ViPipe);
+
+    td_s32 comm_isp_run(ot_isp_dev IspDev);
+
+    td_s32 comm_isp_task(ot_isp_dev IspDev);
 
 private:
 
@@ -66,6 +71,7 @@ private:
     bool wrap_enable;   // 低延时卷绕模式，300w和400w分辨率时使用
     bool video_stretch_enable;  // 200W拉伸为300W
     ot_vpss_chn_buf_wrap_attr stVpssChnBufWrap;
+    std::thread ispThread;
 
 };
 

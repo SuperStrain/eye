@@ -17,6 +17,12 @@
 #include <ot_mipi_rx.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <ss_mpi_ae.h>
+#include <ot_common_ae.h>
+#include <ot_common_3a.h>
+#include <ot_common_awb.h>
+#include <ss_mpi_awb.h>
+#include <sys/prctl.h>
 
 videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), video_stretch_enable(true)
 {
@@ -32,6 +38,8 @@ int videoProcessHi::init()
 {
     hi_mpp_sys_init();
     hi_mpp_vi_init();
+
+    // init vpss module
     return 0;
 }
 
@@ -321,7 +329,7 @@ td_s32 videoProcessHi::comm_vi_start_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_v
         return s32Ret;
     }
 
-    s32Ret = comm_vi_create_isp();
+    s32Ret = comm_vi_create_isp(ViPipe);
     if(TD_SUCCESS != s32Ret)
     {
         LOGGER_ERROR(HIMPP, "comm_vi_create_isp failed with %d!", s32Ret);
@@ -535,7 +543,90 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
     return TD_SUCCESS;
 }
 
-td_s32 videoProcessHi::comm_vi_create_isp()
+td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
 {
+    td_s32 s32Ret;
+    ot_isp_3a_alg_lib stAeLib = { ViPipe, OT_AE_LIB_NAME };
+    ot_isp_3a_alg_lib stAwbLib = { ViPipe, OT_AWB_LIB_NAME };
+    ot_isp_pub_attr stPubAttr = {
+        {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
+        { SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT },
+        30,
+        OT_ISP_BAYER_GBRG,
+        OT_WDR_MODE_NONE,
+        0, TD_FALSE, TD_FALSE,
+        {TD_FALSE, {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT}}
+    };
+
+    // ae register
+    s32Ret = ss_mpi_ae_register(ViPipe, &stAeLib);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "ss_mpi_ae_register failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+
+    // awb_register
+    s32Ret = ss_mpi_awb_register(ViPipe, &stAwbLib);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "ss_mpi_ae_register failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+    
+    s32Ret = ss_mpi_isp_mem_init(ViPipe);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP,"Init Ext memory failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+
+    s32Ret = ss_mpi_isp_set_pub_attr(ViPipe, &stPubAttr);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP,"SetPubAttr failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+
+    s32Ret = ss_mpi_isp_init(ViPipe);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP,"ss_mpi_isp_init failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+    
+    s32Ret = comm_isp_run(ViPipe);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP,"comm_isp_run failed with %#x!", s32Ret);
+        return s32Ret;
+    }    
+
     return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::comm_isp_task(ot_isp_dev IspDev)
+{
+    td_s32 s32Ret = TD_SUCCESS;
+    td_char szThreadName[20] = {};
+    snprintf(szThreadName, 20, "ISP%d_RUN", IspDev);
+    prctl(PR_SET_NAME, szThreadName, 0,0,0);
+
+    LOGGER_NOTICE(HIMPP, "ISP Dev %d running !", IspDev);
+    s32Ret = ss_mpi_isp_run(IspDev);
+    if (TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "HI_MPI_ISP_Run failed with %#x!", s32Ret);
+    }
+
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::comm_isp_run(ot_isp_dev IspDev)
+{
+    td_s32 s32Ret = TD_SUCCESS;
+
+    ispThread = std::thread(&videoProcessHi::comm_isp_task, this, IspDev);
+
+    return s32Ret;
 }

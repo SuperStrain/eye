@@ -56,6 +56,8 @@ set(HI_MPP_LIB
     extend_stats
     ot_mpi_isp
     ss_mpi_isp
+    ss_mpi_ae
+    ss_mpi_awb
     )
 set (THIRDPARTY_LIB
     securec
