@@ -4,7 +4,7 @@
 
 void loggerSpace::Logger::log_printf(const char* log)
 {
-    printf("[zlog] %s\n", log);
+    printf("[ZLOG] %s\n", log);
 }
 
 loggerSpace::Logger::Logger() : initialized_(false)
@@ -117,7 +117,11 @@ int loggerSpace::Logger::check_config_task()
     {
         if(access(UPDATE_FILE, F_OK) == 0)
         {
-            reload_log_config();
+            int ret = reload_log_config();
+            if(ret == 0)
+            {
+                log_printf("update log config successs!");
+            }
             remove(UPDATE_FILE);
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
