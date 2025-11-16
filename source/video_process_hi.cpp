@@ -133,7 +133,7 @@ int videoProcessHi::hi_mpp_vi_init()
     ot_vi_vpss_mode_type ViVpssMode = OT_VI_OFFLINE_VPSS_ONLINE;
     s32Ret = set_vi_vpss_mode(ViDev, ViPipe, ViChn, ViVpssMode);
     if (s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "set_vi_vpss_mode failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "set_vi_vpss_mode failed!");
         return s32Ret;
     }
     LOGGER_NOTICE(HIMPP, "set_vi_vpss_mode success");
@@ -218,30 +218,60 @@ td_s32 videoProcessHi::comm_vpss_get_wrap_cfg(ot_vpss_chn_attr chn_attr[OT_VPSS_
 td_s32 videoProcessHi::set_vi_vpss_mode(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_chn ViChn, 
 ot_vi_vpss_mode_type ViVpssMode)
 {
-    td_s32              i;
-    td_s32              s32Ret;
-    ot_isp_ctrl_param   stIspCtrlParam;
-    td_u32              u32FrameRate;
-    // SAMPLE_VI_CONFIG_S  stViConfig;
-    td_s32              s32ViNum;
-    ot_vi_pipe          ViPipeTmp; 
-    ot_vi_vpss_mode     stVIVPSSMode;
-    // SAMPLE_VI_INFO_S*   pstViInfo = TD_NULL;
+    td_s32 s32Ret;
+    ot_vi_vpss_mode stVIVPSSMode;
+    size_t mode_count = sizeof(stVIVPSSMode.mode) / sizeof(stVIVPSSMode.mode[0]);
+    int has_zero = 0;
 
     s32Ret = ss_mpi_sys_get_vi_vpss_mode(&stVIVPSSMode);
-    if(s32Ret != TD_SUCCESS) {
+    if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_sys_get_vi_vpss_mode failed with %#x", s32Ret);
         return s32Ret;
     }
 
-    stVIVPSSMode.mode[0] = ViVpssMode;
+    /* 检查是否存在 0（可能是不合法的默认值）*/
+    for (size_t i = 0; i < mode_count; ++i) {
+        if (stVIVPSSMode.mode[i] == 0) {
+            has_zero = 1;
+            break;
+        }
+    }
+
+    if (has_zero) {
+        /* 如果读到有 0，说明可能为未初始化状态：为避免驱动拒绝，给所有 pipe 设成传入的合法模式 */
+        for (size_t i = 0; i < mode_count; ++i) {
+            if( stVIVPSSMode.mode[i] == 0)
+                stVIVPSSMode.mode[i] = ViVpssMode;
+        }
+        LOGGER_INFO(HIMPP, "detected zero entries, set all modes to %d", ViVpssMode);
+    } else {
+        /* 否则只修改目标 pipe（保留其它 pipe 的已有配置）*/
+        if ((td_u32)ViPipe >= mode_count) {
+            LOGGER_ERROR(HIMPP, "ViPipe index %d out of range (count=%zu)", ViPipe, mode_count);
+            return -1;
+        }
+        stVIVPSSMode.mode[ViPipe] = ViVpssMode;
+        LOGGER_INFO(HIMPP, "only change pipe %d to mode %d", ViPipe, ViVpssMode);
+    }
+
+    /* 调用 set 并打印尝试写入的值以便排查 */
+    // {
+    //     char buf[128] = {0};
+    //     int off = 0;
+    //     for (size_t i = 0; i < mode_count; ++i) {
+    //         off += snprintf(buf + off, sizeof(buf) - off, "mode[%zu]=%d ", i, stVIVPSSMode.mode[i]);
+    //         if (off >= (int)sizeof(buf)) break;
+    //     }
+    //     LOGGER_NOTICE(HIMPP, "trying to set vi_vpss_mode: %s", buf);
+    // }
 
     s32Ret = ss_mpi_sys_set_vi_vpss_mode(&stVIVPSSMode);
-    if(s32Ret != TD_SUCCESS) {
+    if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_sys_set_vi_vpss_mode failed with %#x", s32Ret);
         return s32Ret;
     }
 
+    LOGGER_NOTICE(HIMPP, "ss_mpi_sys_set_vi_vpss_mode success");
     return TD_SUCCESS;
 }
 
