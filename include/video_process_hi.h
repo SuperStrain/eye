@@ -29,9 +29,9 @@ private:
 
     td_s32 hi_mpp_sys_init();
 
-    td_s32 hi_mpp_vi_init();
+    td_s32 hi_mpp_vi_init(ot_vi_pipe ViPipe, ot_vi_chn ViChn);
 
-    int hi_mpp_vi_init();
+    td_s32 init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnable);
 
     td_void comm_vpss_get_default_chn_attr(ot_vpss_chn_attr *chn_attr);
 
@@ -57,6 +57,14 @@ private:
 
     td_s32 comm_isp_task(ot_isp_dev IspDev);
 
+    td_s32 enable_vpss_chn(ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn, ot_vpss_chn_attr *pstVpssChnAttr, 
+                           ot_vpss_ext_chn_attr *pstVpssExtChnAttr);
+    
+    td_s32 bind_vi_vpss(ot_vi_pipe ViPipe, ot_vi_chn ViChn, 
+                           ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn);
+
+    td_s32 vpss_stop(ot_vpss_grp VpssGrp, td_bool* pabChnEnable);
+
 private:
 
     static constexpr const int VIDEO_STRETCH_WIDTH = 0;
@@ -69,6 +77,7 @@ private:
     static constexpr const int SENSOR_MAX_HRIGHT = 1440;
     static constexpr const int SENSOR_FRAME_RATE = 30;
     static constexpr const char* MIPI_DEV_NODE = "/dev/ot_mipi_rx";
+    static constexpr const bool rotateBSupport = false;
 
     bool wrap_enable;   // 低延时卷绕模式，300w和400w分辨率时使用
     bool video_stretch_enable;  // 200W拉伸为300W

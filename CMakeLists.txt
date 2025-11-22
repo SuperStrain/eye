@@ -58,6 +58,7 @@ set(HI_MPP_LIB
     ss_mpi_isp
     ss_mpi_ae
     ss_mpi_awb
+    ss_mpi_sysbind
     )
 set (THIRDPARTY_LIB
     securec
