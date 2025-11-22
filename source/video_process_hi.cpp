@@ -23,8 +23,11 @@
 #include <ot_common_awb.h>
 #include <ss_mpi_awb.h>
 #include <sys/prctl.h>
+#include <ss_mpi_vpss.h>
+#include <ss_mpi_sys_bind.h>
 
-videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), video_stretch_enable(true)
+videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), 
+video_stretch_enable(true)
 {
 
 }
@@ -37,19 +40,42 @@ videoProcessHi::~videoProcessHi()
 int videoProcessHi::init()
 {
     int ret = TD_SUCCESS;
+
+	ot_vpss_grp VpssGrp = 0;
+    ot_vpss_chn VpssChn = 0;
+    ot_vi_pipe  ViPipe = 0;
+    ot_vi_chn   ViChn  = 0;
+    td_bool     abChnEnable[OT_VPSS_MAX_PHYS_CHN_NUM] = {TD_TRUE, TD_TRUE, TD_FALSE};
+
     ret = hi_mpp_sys_init();
     if (ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "hi_mpp_sys_init failed!");
         goto Release;
     }
 
-    ret = hi_mpp_vi_init();
+    ret = hi_mpp_vi_init(ViPipe, ViChn);
     if (ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "hi_mpp_vi_init failed!");
         goto Release;
     }
 
     // init vpss module
+    ret = init_vpss_module(VpssGrp, abChnEnable);
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "init_vpss_module failed!");
+        goto Release;
+    }
+
+    // bind vi to vpss
+    ret = bind_vi_vpss(ViPipe, ViChn, VpssGrp, VpssChn);
+    if(ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "bind vi to vpss failed, ret %d", ret);
+        goto Release;
+    }
+
+    // ircut_init ?
+
+    // mdetect_init_ivp 移动侦测？
 
 Release:
     return ret;
@@ -142,13 +168,11 @@ Release:
     return s32Ret;
 }
 
-td_s32 videoProcessHi::hi_mpp_vi_init()
+td_s32 videoProcessHi::hi_mpp_vi_init(ot_vi_pipe ViPipe, ot_vi_chn ViChn)
 {
     // set vi_vpss_mode: should be before vpss init
     td_s32 s32Ret = TD_SUCCESS;
     ot_vi_dev   ViDev  = 0;
-    ot_vi_pipe  ViPipe = 0;
-    ot_vi_chn   ViChn  = 0;
     ot_vi_vpss_mode_type ViVpssMode = OT_VI_OFFLINE_VPSS_ONLINE;
     s32Ret = set_vi_vpss_mode(ViDev, ViPipe, ViChn, ViVpssMode);
     if (s32Ret != TD_SUCCESS) {
@@ -166,6 +190,99 @@ td_s32 videoProcessHi::hi_mpp_vi_init()
     LOGGER_NOTICE(HIMPP, "init_vi_module success");
 
 Release:
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnable)
+{
+    td_s32 s32Ret = TD_SUCCESS;
+    ot_vpss_grp_attr stVpssGrpAttr = { };
+    ot_vpss_ext_chn_attr stVpssExtChnAttr;
+    ot_vi_pipe         ViPipe       = 0;
+    ot_vi_chn          ViChn        = 0;
+
+    int resList[][2] = {
+    		{VI_WIDTH, VI_HEIGHT},
+    		{704,      576     },
+    		{352,      288     },
+    		{400,      224     },
+    		{720,      576     },
+    };
+
+    // create vpss group
+	stVpssGrpAttr.max_width = resList[0][0];
+	stVpssGrpAttr.max_height = resList[0][1];
+	stVpssGrpAttr.pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
+	stVpssGrpAttr.dynamic_range = OT_DYNAMIC_RANGE_SDR8;
+	stVpssGrpAttr.frame_rate.src_frame_rate = -1;
+    stVpssGrpAttr.frame_rate.dst_frame_rate = -1;
+	s32Ret = ss_mpi_vpss_create_grp(VpssGrp, &stVpssGrpAttr);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "ss_mpi_vpss_create_grp(grp:%d) failed with %#x!", VpssGrp, s32Ret);
+        return s32Ret;
+    }
+
+    ot_vpss_chn_attr stVpssChnAttr[OT_VPSS_MAX_PHYS_CHN_NUM] = { };
+    ot_vpss_chn VpssChn;
+    // the first stream, enable vpss channel 0
+    VpssChn = 0;
+    stVpssChnAttr[VpssChn].chn_mode      = OT_VPSS_CHN_MODE_USER;
+    stVpssChnAttr[VpssChn].width       = resList[0][0];
+    stVpssChnAttr[VpssChn].height      = resList[0][1];
+    stVpssChnAttr[VpssChn].video_format = OT_VIDEO_FORMAT_LINEAR;
+    stVpssChnAttr[VpssChn].pixel_format  = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
+    stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_SEG_COMPACT;
+    stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;	
+    stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
+    stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
+    stVpssChnAttr[VpssChn].depth = 0;
+    stVpssChnAttr[VpssChn].aspect_ratio.mode = OT_ASPECT_RATIO_NONE;
+    
+    s32Ret = enable_vpss_chn(VpssGrp, VpssChn, &stVpssChnAttr[VpssChn], TD_NULL);
+    if (TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "Enable vpss chn %d failed!", VpssChn);
+	    abChnEnable[VpssChn] = TD_FALSE;
+        return s32Ret;
+    } else {
+	    abChnEnable[VpssChn] = TD_TRUE;
+    }    
+
+    // the second stream, enable vpss channel 1
+    VpssChn = 1;
+    stVpssChnAttr[VpssChn].chn_mode     = OT_VPSS_CHN_MODE_USER;
+    stVpssChnAttr[VpssChn].width      = resList[1][0];
+    stVpssChnAttr[VpssChn].height     = resList[1][1];
+    stVpssChnAttr[VpssChn].video_format = OT_VIDEO_FORMAT_LINEAR;
+    stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;//SAMPLE_PIXEL_FORMAT;
+    stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
+    stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
+    stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
+    stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
+    stVpssChnAttr[VpssChn].depth = 0;
+    stVpssChnAttr[VpssChn].aspect_ratio.mode = OT_ASPECT_RATIO_NONE;
+    s32Ret = enable_vpss_chn(VpssGrp, VpssChn, &stVpssChnAttr[VpssChn], TD_NULL);
+    if (TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "Enable vpss chn %d failed!", VpssChn);
+        abChnEnable[VpssChn] = TD_FALSE;
+        return s32Ret;
+    } else {
+        abChnEnable[VpssChn] = TD_TRUE;
+    }
+
+    s32Ret = ss_mpi_vpss_start_grp(VpssGrp);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "ss_mpi_vpss_start_grp failed with %#x", s32Ret);
+        return s32Ret;
+    }
+
     return s32Ret;
 }
 
@@ -574,7 +691,7 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
     // s32Ret = ss_mpi_vi_enable_chn(ViPipe, ViChn);
     // if (s32Ret != TD_SUCCESS)
     // {
-    //     LOGGER_ERROR(HIMPP, "vi enable chn failed with %#x!\n", s32Ret);
+    //     LOGGER_ERROR(HIMPP, "vi enable chn failed with %#x!", s32Ret);
     //     return s32Ret;
     // }
 
@@ -677,6 +794,153 @@ td_s32 videoProcessHi::comm_isp_run(ot_isp_dev IspDev)
     td_s32 s32Ret = TD_SUCCESS;
 
     ispThread = std::thread(&videoProcessHi::comm_isp_task, this, IspDev);
+
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::enable_vpss_chn(ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn, ot_vpss_chn_attr *pstVpssChnAttr, 
+                        ot_vpss_ext_chn_attr *pstVpssExtChnAttr)
+{
+    td_s32 s32Ret = TD_FAILURE;
+
+    if (VpssGrp < 0 || VpssGrp > OT_VPSS_MAX_GRP_NUM)
+    {
+        LOGGER_ERROR(HIMPP, "VpssGrp%d is out of rang[0,%d]", VpssGrp, OT_VPSS_MAX_GRP_NUM);
+        return s32Ret;
+    }
+
+    if (VpssChn < 0 || VpssChn > OT_VPSS_MAX_CHN_NUM)
+    {
+        LOGGER_ERROR(HIMPP, "VpssChn%d is out of rang[0,%d]", VpssChn, OT_VPSS_MAX_CHN_NUM);
+        return s32Ret;
+    }
+
+    if (TD_NULL == pstVpssChnAttr && TD_NULL == pstVpssExtChnAttr)
+    {
+        LOGGER_ERROR(HIMPP, "null ptr");
+        return s32Ret;
+    }
+
+    if (VpssChn < OT_VPSS_MAX_PHYS_CHN_NUM)
+    {
+        s32Ret = ss_mpi_vpss_set_chn_attr(VpssGrp, VpssChn, pstVpssChnAttr);
+        if (s32Ret != TD_SUCCESS)
+        {
+            LOGGER_ERROR(HIMPP, "mpi vpss set chn_attr failed, VpssChn %d VpssChn %d ret %#x", VpssGrp, VpssChn, s32Ret);
+            return s32Ret;
+        }
+    }
+    else
+    {
+        s32Ret = ss_mpi_vpss_set_ext_chn_attr(VpssGrp, VpssChn, pstVpssExtChnAttr);
+        if (s32Ret != TD_SUCCESS)
+        {
+            LOGGER_ERROR(HIMPP, "mpi vpss set ext_chn_attr failed, VpssChn %d VpssChn %d ret %#x", VpssGrp, VpssChn, s32Ret);
+            return s32Ret;
+        }
+    }
+
+    if (VpssChn < OT_VPSS_MAX_PHYS_CHN_NUM)
+    {
+        if(rotateBSupport)
+        {
+        	ot_rotation_attr rotate_attr = { };
+			rotate_attr.enable = TD_TRUE;
+			rotate_attr.rotation_type = OT_ROTATION_ANG_FIXED;
+			rotate_attr.rotation_fixed = OT_ROTATION_90;
+            s32Ret = ss_mpi_vpss_set_chn_rotation(VpssGrp, VpssChn, &rotate_attr);
+            if(s32Ret != TD_SUCCESS)
+            {
+                LOGGER_ERROR(HIMPP, "mpi vpss set chn_rotation failed, VpssGrp %d VpssChn %d ret %#x", VpssGrp, VpssChn, s32Ret);
+                return s32Ret;
+            }
+        }
+    }
+
+    if (wrap_enable)	// 开卷绕
+    {
+        if (VpssChn == 0)   // vpss limit! just vpss chan0 support wrap
+        {
+            s32Ret = ss_mpi_vpss_set_chn_buf_wrap(VpssGrp, VpssChn, &stVpssChnBufWrap);
+            if (s32Ret != TD_SUCCESS)
+            {
+                LOGGER_ERROR(HIMPP, "mpi vpss set chn_buf_wrap failed, VpssGrp %d VpssChn %d ret %#x", VpssGrp, VpssChn, s32Ret);
+                return s32Ret;
+            }
+        }
+    }
+
+    s32Ret = ss_mpi_vpss_enable_chn(VpssGrp, VpssChn);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "mpi vpss enable chn failed, VpssGrp %d VpssChn %d ret %#x", VpssGrp, VpssChn, s32Ret);
+        return s32Ret;
+    }
+
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::bind_vi_vpss(ot_vi_pipe ViPipe, ot_vi_chn ViChn, 
+                           ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn)
+{
+    ot_mpp_chn stSrcChn;
+    ot_mpp_chn stDestChn;
+
+    stSrcChn.mod_id   = OT_ID_VI;
+    stSrcChn.dev_id  = ViPipe;
+    stSrcChn.chn_id  = ViChn;
+
+    stDestChn.mod_id  = OT_ID_VPSS;
+    stDestChn.dev_id = VpssGrp;
+    stDestChn.chn_id = VpssChn;
+
+    int s32Ret = ss_mpi_sys_bind(&stSrcChn, &stDestChn);
+    if(s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "sys bind failed, ViPipe %d, ViChn %d, VpssGrp %d, VpssChn %d, ret %#x!", 
+            ViPipe, ViChn, VpssGrp, VpssChn, s32Ret);
+	    td_bool abChnEnable[OT_VPSS_MAX_PHYS_CHN_NUM] = {TD_TRUE, TD_TRUE, TD_FALSE};
+		vpss_stop(VpssGrp, abChnEnable);
+        return s32Ret;
+    }
+
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::vpss_stop(ot_vpss_grp VpssGrp, td_bool* pabChnEnable)
+{
+    td_s32 j;
+    td_s32 s32Ret = TD_SUCCESS;
+    ot_vpss_chn VpssChn;
+
+    for (j = 0; j < OT_VPSS_MAX_PHYS_CHN_NUM; j++)
+    {
+        if(TD_TRUE == pabChnEnable[j])
+        {
+            VpssChn = j;
+            s32Ret = ss_mpi_vpss_disable_chn(VpssGrp, VpssChn);
+
+            if (s32Ret != TD_SUCCESS)
+            {
+                LOGGER_ERROR(HIMPP, "failed with %#x!", s32Ret);
+                return s32Ret;
+            }
+        }
+    }
+
+    s32Ret = ss_mpi_vpss_stop_grp(VpssGrp);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "failed with %#x!", s32Ret);
+        return s32Ret;
+    }
+
+    s32Ret = ss_mpi_vpss_destroy_grp(VpssGrp);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "failed with %#x!", s32Ret);
+        return s32Ret;
+    }
 
     return s32Ret;
 }
