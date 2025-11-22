@@ -27,7 +27,9 @@ private:
     
     ~videoProcessHi();
 
-    int hi_mpp_sys_init();
+    td_s32 hi_mpp_sys_init();
+
+    td_s32 hi_mpp_vi_init();
 
     int hi_mpp_vi_init();
 

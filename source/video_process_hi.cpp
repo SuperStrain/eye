@@ -36,21 +36,33 @@ videoProcessHi::~videoProcessHi()
 
 int videoProcessHi::init()
 {
-    hi_mpp_sys_init();
-    hi_mpp_vi_init();
+    int ret = TD_SUCCESS;
+    ret = hi_mpp_sys_init();
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "hi_mpp_sys_init failed!");
+        goto Release;
+    }
+
+    ret = hi_mpp_vi_init();
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "hi_mpp_vi_init failed!");
+        goto Release;
+    }
 
     // init vpss module
-    return 0;
+
+Release:
+    return ret;
 }
 
-int videoProcessHi::hi_mpp_sys_init()
+td_s32 videoProcessHi::hi_mpp_sys_init()
 {
     ot_vpss_chn_attr chn_attr[3] = {};
     ot_vb_cfg stVbConf = {};
     ot_pic_buf_attr buf_attr = {};
     ot_mpp_sys_cfg stSysConf = { 64 };
     td_u64 u64BlkSize = 0;
-    td_s32 s32Ret = TD_FAILURE;
+    td_s32 s32Ret = TD_SUCCESS;
 
     buf_attr.align = OT_DEFAULT_ALIGN;
     buf_attr.bit_width = OT_DATA_BIT_WIDTH_8;
@@ -93,40 +105,47 @@ int videoProcessHi::hi_mpp_sys_init()
     s32Ret = ss_mpi_sys_exit();
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_sys_exit failed with %#x", s32Ret);
+        goto Release;
     }
 
     s32Ret = ss_mpi_vb_exit();
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_vb_exit failed with %#x", s32Ret);
+        goto Release;
     }
 
     s32Ret = ss_mpi_vb_set_cfg(&stVbConf);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_vb_set_cfg failed with %#x", s32Ret);
+        goto Release;
     }
 
     s32Ret = ss_mpi_vb_init();
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_vb_init failed with %#x", s32Ret);
+        goto Release;
     }
 
     s32Ret = ss_mpi_sys_set_cfg(&stSysConf);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_sys_set_cfg failed with %#x", s32Ret);
+        goto Release;
     }
 
     s32Ret = ss_mpi_sys_init();
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_sys_init failed with %#x", s32Ret);
+        goto Release;
     }
 
-    return 0;
+Release:
+    return s32Ret;
 }
 
-int videoProcessHi::hi_mpp_vi_init()
+td_s32 videoProcessHi::hi_mpp_vi_init()
 {
     // set vi_vpss_mode: should be before vpss init
-    td_s32 s32Ret = TD_FAILURE;
+    td_s32 s32Ret = TD_SUCCESS;
     ot_vi_dev   ViDev  = 0;
     ot_vi_pipe  ViPipe = 0;
     ot_vi_chn   ViChn  = 0;
@@ -134,7 +153,7 @@ int videoProcessHi::hi_mpp_vi_init()
     s32Ret = set_vi_vpss_mode(ViDev, ViPipe, ViChn, ViVpssMode);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "set_vi_vpss_mode failed!");
-        return s32Ret;
+        goto Release;
     }
     LOGGER_NOTICE(HIMPP, "set_vi_vpss_mode success");
 
@@ -142,11 +161,12 @@ int videoProcessHi::hi_mpp_vi_init()
     s32Ret = init_vi_module(ViDev, ViPipe, ViChn);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "init_vi_module failed with %#x", s32Ret);
-        return s32Ret;
+        goto Release;
     }
     LOGGER_NOTICE(HIMPP, "init_vi_module success");
 
-    return 0;
+Release:
+    return s32Ret;
 }
 
 td_void videoProcessHi::comm_vpss_get_default_chn_attr(ot_vpss_chn_attr *chn_attr)
