@@ -184,7 +184,7 @@ td_s32 videoProcessHi::hi_mpp_vi_init(ot_vi_pipe ViPipe, ot_vi_chn ViChn)
     // init vi module
     s32Ret = init_vi_module(ViDev, ViPipe, ViChn);
     if (s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "init_vi_module failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "init_vi_module failed with %d", s32Ret);
         goto Release;
     }
     LOGGER_NOTICE(HIMPP, "init_vi_module success");
@@ -437,7 +437,7 @@ td_s32 videoProcessHi::init_vi_module(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_vi_
     // init vi process: vi enable dev, bind-create-start pipe, enable chn
     s32Ret = init_vi_process(ViVpssMode, ViDev, ViPipe, ViChn);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "Init VI err for %#x!", s32Ret);
+        LOGGER_ERROR(HIMPP, "Init VI err for %d!", s32Ret);
         return s32Ret;
     }
 	LOGGER_NOTICE(HIMPP, "init vi process success");
@@ -524,7 +524,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     // set mipi hs mode
     s32Ret = ioctl(fd, OT_MIPI_SET_HS_MODE, &lane_divide_mode);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_HS_MODE failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_HS_MODE failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
@@ -532,7 +532,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     // enable mipi clock
     s32Ret = ioctl(fd, OT_MIPI_ENABLE_MIPI_CLOCK, &devno);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_ENABLE_MIPI_CLOCK failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_ENABLE_MIPI_CLOCK failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
@@ -540,7 +540,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     // reset mipi
     s32Ret = ioctl(fd, OT_MIPI_RESET_MIPI, &devno);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_RESET_MIPI failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_RESET_MIPI failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
@@ -548,7 +548,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     // enable sensor clock
     s32Ret = ioctl(fd, OT_MIPI_ENABLE_SENSOR_CLOCK, &snsDev);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_ENABLE_SENSOR_CLOCK failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_ENABLE_SENSOR_CLOCK failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
@@ -556,12 +556,13 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     // reset sensor
     s32Ret = ioctl(fd, OT_MIPI_RESET_SENSOR, &snsDev);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_RESET_SENSOR failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_RESET_SENSOR failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
     
     // set mipi dev attr (SC4336P)
+    memset(&stcomboDevAttr, 0, sizeof(stcomboDevAttr));
     stcomboDevAttr.devno = devno;
     stcomboDevAttr.input_mode = INPUT_MODE_MIPI;
     stcomboDevAttr.data_rate = MIPI_DATA_RATE_X1;
@@ -569,10 +570,12 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     stcomboDevAttr.mipi_attr = {
         DATA_TYPE_RAW_10BIT,
         OT_MIPI_WDR_MODE_NONE,
+        {0, 1, 2, 3},
+        {-1, -1, -1, -1}
     };
     s32Ret = ioctl(fd, OT_MIPI_SET_DEV_ATTR, &stcomboDevAttr);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_DEV_ATTR failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_DEV_ATTR failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
@@ -580,7 +583,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     // unreset mipi
     s32Ret = ioctl(fd, OT_MIPI_UNRESET_MIPI, &devno);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_UNRESET_MIPI failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_UNRESET_MIPI failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
@@ -588,7 +591,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     // unreset sensor
     s32Ret = ioctl(fd, OT_MIPI_UNRESET_SENSOR, &snsDev);
     if(s32Ret != TD_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_UNRESET_SENSOR failed with %#x", s32Ret);
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_UNRESET_SENSOR failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
