@@ -728,12 +728,14 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
         {TD_FALSE, {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT}}
     };
 
+    // register sensor
+
     // ae register
     s32Ret = ss_mpi_ae_register(ViPipe, &stAeLib);
     if (s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP, "ss_mpi_ae_register failed with %#x!", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }
 
     // awb_register
@@ -741,35 +743,35 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
     if (s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP, "ss_mpi_ae_register failed with %#x!", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }
     
     s32Ret = ss_mpi_isp_mem_init(ViPipe);
     if (s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP,"Init Ext memory failed with %#x!", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }
 
     s32Ret = ss_mpi_isp_set_pub_attr(ViPipe, &stPubAttr);
     if (s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP,"SetPubAttr failed with %#x!", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }
 
     s32Ret = ss_mpi_isp_init(ViPipe);
     if (s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP,"ss_mpi_isp_init failed with %#x!", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }
     
     s32Ret = comm_isp_run(ViPipe);
     if (s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP,"comm_isp_run failed with %#x!", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }    
 
     return TD_SUCCESS;
