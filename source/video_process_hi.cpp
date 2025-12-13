@@ -25,6 +25,7 @@
 #include <sys/prctl.h>
 #include <ss_mpi_vpss.h>
 #include <ss_mpi_sys_bind.h>
+#include <sensor/sc4336p/sc4336p_cmos.h>
 
 videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), 
 video_stretch_enable(true)
@@ -729,6 +730,19 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
     };
 
     // register sensor
+    ot_isp_sns_obj* pstSnsObj = sc4336p_get_obj();
+    if( pstSnsObj == TD_NULL )
+    {
+        LOGGER_ERROR(HIMPP, "get sc4336p sensor obj failed!");
+        return TD_FAILURE;
+    }
+
+    if( pstSnsObj->pfn_register_callback == TD_NULL )
+    {
+        LOGGER_ERROR(HIMPP, "pfn_register_callback is null!");
+        return TD_FAILURE;
+    }
+    pstSnsObj->pfn_register_callback(ViPipe, &stAeLib, &stAwbLib);
 
     // ae register
     s32Ret = ss_mpi_ae_register(ViPipe, &stAeLib);
