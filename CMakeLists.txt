@@ -59,6 +59,7 @@ set(HI_MPP_LIB
     ss_mpi_ae
     ss_mpi_awb
     ss_mpi_sysbind
+    sns_sc4336p
     )
 set (THIRDPARTY_LIB
     securec
