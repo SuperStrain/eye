@@ -17,7 +17,7 @@ int main() {
 
     loggerSpace::Logger::instance().init();
 
-    videoProcessHi::getInstance().init();
+    hiMppMedia::videoProcessHi::getInstance().init();
 
     pause();
 

@@ -26,6 +26,9 @@
 #include <ss_mpi_vpss.h>
 #include <ss_mpi_sys_bind.h>
 #include <sensor/sc4336p/sc4336p_cmos.h>
+#include "global_constants.h"
+
+namespace hiMppMedia {
 
 videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), 
 video_stretch_enable(true)
@@ -227,7 +230,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     ot_vpss_chn_attr stVpssChnAttr[OT_VPSS_MAX_PHYS_CHN_NUM] = { };
     ot_vpss_chn VpssChn;
     // the first stream, enable vpss channel 0
-    VpssChn = 0;
+    VpssChn = vpssChn1;
     stVpssChnAttr[VpssChn].chn_mode      = OT_VPSS_CHN_MODE_USER;
     stVpssChnAttr[VpssChn].width       = resList[0][0];
     stVpssChnAttr[VpssChn].height      = resList[0][1];
@@ -253,7 +256,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     }    
 
     // the second stream, enable vpss channel 1
-    VpssChn = 1;
+    VpssChn = vpssChn2;
     stVpssChnAttr[VpssChn].chn_mode     = OT_VPSS_CHN_MODE_USER;
     stVpssChnAttr[VpssChn].width      = resList[1][0];
     stVpssChnAttr[VpssChn].height     = resList[1][1];
@@ -963,3 +966,5 @@ td_s32 videoProcessHi::vpss_stop(ot_vpss_grp VpssGrp, td_bool* pabChnEnable)
 
     return s32Ret;
 }
+
+}   // hiMppMedia
