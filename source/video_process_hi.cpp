@@ -26,7 +26,7 @@
 #include <ss_mpi_vpss.h>
 #include <ss_mpi_sys_bind.h>
 #include <sensor/sc4336p/sc4336p_cmos.h>
-#include "global_constants.h"
+
 
 namespace hiMppMedia {
 
@@ -461,7 +461,7 @@ td_s32 videoProcessHi::init_vi_process(ot_vi_vpss_mode_type ViVpssMode, ot_vi_de
         return s32Ret;
     }
 
-    stIspCtrlParam.stat_interval  = SENSOR_FRAME_RATE/30;
+    stIspCtrlParam.stat_interval  = SENSOR_FRAME_RATE / 30;
     s32Ret = ss_mpi_isp_set_ctrl_param(ViPipe, &stIspCtrlParam);
     if (TD_SUCCESS != s32Ret)
     {
@@ -570,7 +570,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     stcomboDevAttr.devno = devno;
     stcomboDevAttr.input_mode = INPUT_MODE_MIPI;
     stcomboDevAttr.data_rate = MIPI_DATA_RATE_X1;
-    stcomboDevAttr.img_rect = {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT};
+    stcomboDevAttr.img_rect = {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT};
     stcomboDevAttr.mipi_attr = {
         DATA_TYPE_RAW_10BIT,
         OT_MIPI_WDR_MODE_NONE,
@@ -620,25 +620,25 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
             .hsync_neg = OT_VI_HSYNC_NEG_HIGH,
             .vsync_valid = OT_VI_VSYNC_NORM_PULSE,
             .vsync_valid_neg = OT_VI_VSYNC_VALID_NEG_HIGH,
-            .timing_blank = {0, SENSOR_MAX_WIDTH, 0, 0, SENSOR_MAX_HRIGHT, 0, 0, 0, 0}
+            .timing_blank = {0, SENSOR_MAX_WIDTH, 0, 0, SENSOR_MAX_HEIGHT, 0, 0, 0, 0}
         },
         .data_type = OT_VI_DATA_TYPE_RAW,
         .data_reverse = TD_FALSE,
-        .in_size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
+        .in_size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
         .data_rate = OT_DATA_RATE_X1
     };
     // ot_vi_bind_pipe  stDevBindPipe = {};
     ot_vi_pipe_attr  stPipeAttr = {
         .pipe_bypass_mode = OT_VI_PIPE_BYPASS_NONE,
         .isp_bypass = TD_FALSE,
-        .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
+        .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
         .pixel_format = OT_PIXEL_FORMAT_RGB_BAYER_10BPP,
         .compress_mode = OT_COMPRESS_MODE_NONE,
         .frame_rate_ctrl = {-1, -1}
     };
 
     ot_vi_chn_attr stChnAttr = {
-        .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
+        .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
         .pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420,
         .dynamic_range = OT_DYNAMIC_RANGE_SDR8,
         .video_format = OT_VIDEO_FORMAT_LINEAR,
@@ -723,13 +723,13 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
     ot_isp_3a_alg_lib stAeLib = { ViPipe, OT_AE_LIB_NAME };
     ot_isp_3a_alg_lib stAwbLib = { ViPipe, OT_AWB_LIB_NAME };
     ot_isp_pub_attr stPubAttr = {
-        {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT},
-        { SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT },
+        {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
+        { SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT },
         30,
         OT_ISP_BAYER_GBRG,
         OT_WDR_MODE_NONE,
         0, TD_FALSE, TD_FALSE,
-        {TD_FALSE, {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HRIGHT}}
+        {TD_FALSE, {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT}}
     };
 
     // register sensor
@@ -866,10 +866,10 @@ td_s32 videoProcessHi::enable_vpss_chn(ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn,
     {
         if(rotateBSupport)
         {
-        	ot_rotation_attr rotate_attr = { };
-			rotate_attr.enable = TD_TRUE;
-			rotate_attr.rotation_type = OT_ROTATION_ANG_FIXED;
-			rotate_attr.rotation_fixed = OT_ROTATION_90;
+            ot_rotation_attr rotate_attr = { };
+            rotate_attr.enable = TD_TRUE;
+            rotate_attr.rotation_type = OT_ROTATION_ANG_FIXED;
+            rotate_attr.rotation_fixed = OT_ROTATION_90;
             s32Ret = ss_mpi_vpss_set_chn_rotation(VpssGrp, VpssChn, &rotate_attr);
             if(s32Ret != TD_SUCCESS)
             {

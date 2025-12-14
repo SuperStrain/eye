@@ -4,6 +4,7 @@
 #include <ot_common_vpss.h>
 #include <ot_type.h>
 #include <thread>
+#include "global_constants.h"
 
 namespace hiMppMedia {
 class videoProcessHi
@@ -68,17 +69,17 @@ private:
 
 private:
 
-    static constexpr const int VIDEO_STRETCH_WIDTH = 0;
-    static constexpr const int VIDEO_STRETCH_HEIGHT = 0;
-    static constexpr const int VI_WIDTH = 1920;
-    static constexpr const int VI_HEIGHT = 1080;
-	static constexpr const int IVP_SMD_W = 640;
-	static constexpr const int IVP_SMD_H = 384;
-    static constexpr const int SENSOR_MAX_WIDTH = 2560;
-    static constexpr const int SENSOR_MAX_HRIGHT = 1440;
-    static constexpr const int SENSOR_FRAME_RATE = 30;
+    static constexpr int VIDEO_STRETCH_WIDTH = 0;
+    static constexpr int VIDEO_STRETCH_HEIGHT = 0;
+    static constexpr int VI_WIDTH = 1920;
+    static constexpr int VI_HEIGHT = 1080;
+	static constexpr int IVP_SMD_W = 640;
+	static constexpr int IVP_SMD_H = 384;
+    static constexpr int SENSOR_MAX_WIDTH = maxWidth;
+    static constexpr int SENSOR_MAX_HEIGHT = maxHeight;
+    static constexpr int SENSOR_FRAME_RATE = maxFrameRate;
     static constexpr const char* MIPI_DEV_NODE = "/dev/ot_mipi_rx";
-    static constexpr const bool rotateBSupport = false;
+    static constexpr bool rotateBSupport = false;
 
     bool wrap_enable;   // 低延时卷绕模式，300w和400w分辨率时使用
     bool video_stretch_enable;  // 200W拉伸为300W
