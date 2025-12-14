@@ -5,6 +5,7 @@
 #include <ot_type.h>
 #include <thread>
 
+namespace hiMppMedia {
 class videoProcessHi
 {
 public:
@@ -85,5 +86,7 @@ private:
     std::thread ispThread;
 
 };
+
+} // namespace hiMppMedia
 
 #endif  // VIDEO_PROCESS_HI_H
