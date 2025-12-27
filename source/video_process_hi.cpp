@@ -31,7 +31,7 @@
 namespace hiMppMedia {
 
 videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), 
-video_stretch_enable(true)
+video_stretch_enable(false)
 {
 
 }
@@ -101,25 +101,28 @@ td_s32 videoProcessHi::hi_mpp_sys_init()
     buf_attr.video_format = OT_VIDEO_FORMAT_LINEAR;
 
     comm_vpss_get_default_chn_attr(&chn_attr[0]);
-    comm_vpss_get_wrap_cfg(&chn_attr[0], OT_VI_OFFLINE_VPSS_ONLINE, 1700, &stVpssChnBufWrap);
+
+    if(wrap_enable) {
+        comm_vpss_get_wrap_cfg(&chn_attr[0], OT_VI_OFFLINE_VPSS_ONLINE, 1700, &stVpssChnBufWrap);
+    }
 
     // 初始化MPP视频缓存池
-    stVbConf.max_pool_cnt = 40;
+    stVbConf.max_pool_cnt = 128;
     if(wrap_enable) {
         stVbConf.common_pool[0].blk_cnt = 1;
         stVbConf.common_pool[0].blk_size = stVpssChnBufWrap.buf_size;
     } else {
         //主码流 VI-offline-VPSS 2; VPSS-online-VENC 1; 修改分辨率时 VPSS-VGS-VENC 1;
-        buf_attr.width = VI_WIDTH;
-        buf_attr.height = VI_HEIGHT;
+        buf_attr.width = VI_WIDTH0;
+        buf_attr.height = VI_HEIGHT0;
 		u64BlkSize = ot_common_get_pic_buf_size(&buf_attr);
         stVbConf.common_pool[0].blk_size = u64BlkSize;
-        stVbConf.common_pool[0].blk_cnt = 2;      
+        stVbConf.common_pool[0].blk_cnt = 3;      
     }
 
     //次码流 VPSS-online-VENC 1; 多分一个帧率才稳定，没弄懂
-    buf_attr.width = 720;
-    buf_attr.height = 576;
+    buf_attr.width = VI_WIDTH1;
+    buf_attr.height = VI_HEIGHT1;
     u64BlkSize = ot_common_get_pic_buf_size(&buf_attr);
     stVbConf.common_pool[1].blk_size = u64BlkSize;
     stVbConf.common_pool[1].blk_cnt = 2;
@@ -127,7 +130,6 @@ td_s32 videoProcessHi::hi_mpp_sys_init()
     //移动侦测&智能分析 1;
     buf_attr.width = IVP_SMD_W;
     buf_attr.height = IVP_SMD_H;
-    // buf_attr.pixel_format = OT_PIXEL_FORMAT_YUV_400;
     u64BlkSize = ot_common_get_pic_buf_size(&buf_attr);
     stVbConf.common_pool[2].blk_size = u64BlkSize;
     stVbConf.common_pool[2].blk_cnt = 2;
@@ -149,6 +151,8 @@ td_s32 videoProcessHi::hi_mpp_sys_init()
         LOGGER_ERROR(HIMPP, "ss_mpi_vb_set_cfg failed with %#x", s32Ret);
         goto Release;
     }
+
+    // ss_mpi_vb_set_supplement_cfg
 
     s32Ret = ss_mpi_vb_init();
     if (s32Ret != TD_SUCCESS) {
@@ -177,7 +181,7 @@ td_s32 videoProcessHi::hi_mpp_vi_init(ot_vi_pipe ViPipe, ot_vi_chn ViChn)
     // set vi_vpss_mode: should be before vpss init
     td_s32 s32Ret = TD_SUCCESS;
     ot_vi_dev   ViDev  = 0;
-    ot_vi_vpss_mode_type ViVpssMode = OT_VI_OFFLINE_VPSS_ONLINE;
+    ot_vi_vpss_mode_type ViVpssMode = OT_VI_ONLINE_VPSS_ONLINE;
     s32Ret = set_vi_vpss_mode(ViDev, ViPipe, ViChn, ViVpssMode);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "set_vi_vpss_mode failed!");
@@ -206,11 +210,11 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     ot_vi_chn          ViChn        = 0;
 
     int resList[][2] = {
-    		{VI_WIDTH, VI_HEIGHT},
-    		{704,      576     },
+            {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
+    		{VI_WIDTH0, VI_HEIGHT0},
+    		{VI_WIDTH1, VI_HEIGHT1},
     		{352,      288     },
     		{400,      224     },
-    		{720,      576     },
     };
 
     // create vpss group
@@ -232,8 +236,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     // the first stream, enable vpss channel 0
     VpssChn = vpssChn1;
     stVpssChnAttr[VpssChn].chn_mode      = OT_VPSS_CHN_MODE_USER;
-    stVpssChnAttr[VpssChn].width       = resList[0][0];
-    stVpssChnAttr[VpssChn].height      = resList[0][1];
+    stVpssChnAttr[VpssChn].width       = resList[1][0];
+    stVpssChnAttr[VpssChn].height      = resList[1][1];
     stVpssChnAttr[VpssChn].video_format = OT_VIDEO_FORMAT_LINEAR;
     stVpssChnAttr[VpssChn].pixel_format  = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_SEG_COMPACT;
@@ -242,7 +246,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;	
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
-    stVpssChnAttr[VpssChn].depth = 0;
+    stVpssChnAttr[VpssChn].depth = 2;
     stVpssChnAttr[VpssChn].aspect_ratio.mode = OT_ASPECT_RATIO_NONE;
     
     s32Ret = enable_vpss_chn(VpssGrp, VpssChn, &stVpssChnAttr[VpssChn], TD_NULL);
@@ -258,8 +262,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     // the second stream, enable vpss channel 1
     VpssChn = vpssChn2;
     stVpssChnAttr[VpssChn].chn_mode     = OT_VPSS_CHN_MODE_USER;
-    stVpssChnAttr[VpssChn].width      = resList[1][0];
-    stVpssChnAttr[VpssChn].height     = resList[1][1];
+    stVpssChnAttr[VpssChn].width      = resList[2][0];
+    stVpssChnAttr[VpssChn].height     = resList[2][1];
     stVpssChnAttr[VpssChn].video_format = OT_VIDEO_FORMAT_LINEAR;
     stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;//SAMPLE_PIXEL_FORMAT;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
@@ -268,7 +272,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
-    stVpssChnAttr[VpssChn].depth = 0;
+    stVpssChnAttr[VpssChn].depth = 2;
     stVpssChnAttr[VpssChn].aspect_ratio.mode = OT_ASPECT_RATIO_NONE;
     s32Ret = enable_vpss_chn(VpssGrp, VpssChn, &stVpssChnAttr[VpssChn], TD_NULL);
     if (TD_SUCCESS != s32Ret)
@@ -367,49 +371,25 @@ ot_vi_vpss_mode_type ViVpssMode)
     s32Ret = ss_mpi_sys_get_vi_vpss_mode(&stVIVPSSMode);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_sys_get_vi_vpss_mode failed with %#x", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }
 
-    /* 检查是否存在 0（可能是不合法的默认值）*/
-    for (size_t i = 0; i < mode_count; ++i) {
-        if (stVIVPSSMode.mode[i] == 0) {
-            has_zero = 1;
-            break;
-        }
-    }
-
-    if (has_zero) {
-        /* 如果读到有 0，说明可能为未初始化状态：为避免驱动拒绝，给所有 pipe 设成传入的合法模式 */
-        for (size_t i = 0; i < mode_count; ++i) {
-            if( stVIVPSSMode.mode[i] == 0)
-                stVIVPSSMode.mode[i] = ViVpssMode;
-        }
-        LOGGER_INFO(HIMPP, "detected zero entries, set all modes to %d", ViVpssMode);
+    ot_vi_vpss_mode_type otherViVpssMode;
+    if(ViVpssMode == OT_VI_OFFLINE_VPSS_ONLINE) {
+        otherViVpssMode = OT_VI_OFFLINE_VPSS_ONLINE;
     } else {
-        /* 否则只修改目标 pipe（保留其它 pipe 的已有配置）*/
-        if ((td_u32)ViPipe >= mode_count) {
-            LOGGER_ERROR(HIMPP, "ViPipe index %d out of range (count=%zu)", ViPipe, mode_count);
-            return -1;
-        }
-        stVIVPSSMode.mode[ViPipe] = ViVpssMode;
-        LOGGER_INFO(HIMPP, "only change pipe %d to mode %d", ViPipe, ViVpssMode);
+        otherViVpssMode = OT_VI_OFFLINE_VPSS_OFFLINE;
     }
 
-    /* 调用 set 并打印尝试写入的值以便排查 */
-    // {
-    //     char buf[128] = {0};
-    //     int off = 0;
-    //     for (size_t i = 0; i < mode_count; ++i) {
-    //         off += snprintf(buf + off, sizeof(buf) - off, "mode[%zu]=%d ", i, stVIVPSSMode.mode[i]);
-    //         if (off >= (int)sizeof(buf)) break;
-    //     }
-    //     LOGGER_NOTICE(HIMPP, "trying to set vi_vpss_mode: %s", buf);
-    // }
+    stVIVPSSMode.mode[0] = ViVpssMode;
+    for (size_t i = 1; i < mode_count; ++i) {
+        stVIVPSSMode.mode[i] = otherViVpssMode;
+    }
 
     s32Ret = ss_mpi_sys_set_vi_vpss_mode(&stVIVPSSMode);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ss_mpi_sys_set_vi_vpss_mode failed with %#x", s32Ret);
-        return s32Ret;
+        return TD_FAILURE;
     }
 
     LOGGER_NOTICE(HIMPP, "ss_mpi_sys_set_vi_vpss_mode success");
@@ -517,6 +497,7 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     combo_dev_t devno = 0;
     sns_clk_source_t snsDev = 0;
     combo_dev_attr_t stcomboDevAttr;
+    ext_data_type_t mipi_ext_data_type_default_attr;
 
     lane_divide_mode_t lane_divide_mode = LANE_DIVIDE_MODE_0;
     fd = open(MIPI_DEV_NODE, O_RDWR);
@@ -572,14 +553,27 @@ td_s32 videoProcessHi::comm_vi_start_mipi()
     stcomboDevAttr.data_rate = MIPI_DATA_RATE_X1;
     stcomboDevAttr.img_rect = {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT};
     stcomboDevAttr.mipi_attr = {
-        DATA_TYPE_RAW_10BIT,
+        DATA_TYPE_RAW_12BIT,
         OT_MIPI_WDR_MODE_NONE,
-        {0, 1, 2, 3},
-        {-1, -1, -1, -1}
+        {0, 2, -1, -1}
     };
     s32Ret = ioctl(fd, OT_MIPI_SET_DEV_ATTR, &stcomboDevAttr);
     if(s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_DEV_ATTR failed with %d, %s", errno, strerror(errno));
+        close(fd);
+        return TD_FAILURE;
+    }
+
+    memset(&mipi_ext_data_type_default_attr, 0, sizeof(ext_data_type_t));
+    mipi_ext_data_type_default_attr = {
+        .devno = 0,
+        .num = 3,
+        .ext_data_bit_width = {12, 12, 12},
+        .ext_data_type = {0x2c, 0x2c, 0x2c}
+    };
+    s32Ret = ioctl(fd, OT_MIPI_SET_EXT_DATA_TYPE, &mipi_ext_data_type_default_attr);
+    if(s32Ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ioctl OT_MIPI_SET_EXT_DATA_TYPE failed with %d, %s", errno, strerror(errno));
         close(fd);
         return TD_FAILURE;
     }
@@ -610,17 +604,18 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
     ot_vi_dev_attr stViDevAttr = {
         .intf_mode = OT_VI_INTF_MODE_MIPI,
         .work_mode = OT_VI_WORK_MODE_MULTIPLEX_1,
+        .component_mask = {0xfff00000, 0x00000000},
         .scan_mode = OT_VI_SCAN_PROGRESSIVE,
         .ad_chn_id = { -1, -1, -1, -1 },
         .data_seq = OT_VI_DATA_SEQ_YUYV,
         .sync_cfg = {
-            .vsync = OT_VI_VSYNC_PULSE,
+            .vsync = OT_VI_VSYNC_FIELD,
             .vsync_neg = OT_VI_VSYNC_NEG_HIGH,
-            .hsync = OT_VI_HSYNC_PULSE,
+            .hsync = OT_VI_HSYNC_VALID_SIG,
             .hsync_neg = OT_VI_HSYNC_NEG_HIGH,
-            .vsync_valid = OT_VI_VSYNC_NORM_PULSE,
+            .vsync_valid = OT_VI_VSYNC_VALID_SIG,
             .vsync_valid_neg = OT_VI_VSYNC_VALID_NEG_HIGH,
-            .timing_blank = {0, SENSOR_MAX_WIDTH, 0, 0, SENSOR_MAX_HEIGHT, 0, 0, 0, 0}
+            .timing_blank = {0, 0, 0, 0, 0, 0, 0, 0, 0}
         },
         .data_type = OT_VI_DATA_TYPE_RAW,
         .data_reverse = TD_FALSE,
@@ -632,7 +627,7 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
         .pipe_bypass_mode = OT_VI_PIPE_BYPASS_NONE,
         .isp_bypass = TD_FALSE,
         .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
-        .pixel_format = OT_PIXEL_FORMAT_RGB_BAYER_10BPP,
+        .pixel_format = OT_PIXEL_FORMAT_RGB_BAYER_12BPP,
         .compress_mode = OT_COMPRESS_MODE_NONE,
         .frame_rate_ctrl = {-1, -1}
     };
@@ -670,6 +665,8 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
         return s32Ret;
     }
 
+    // sample_comm_vi_set_grp_info
+
     // create vi pipe, then start it
     s32Ret = ss_mpi_vi_create_pipe(ViDev, &stPipeAttr);
     if(s32Ret != TD_SUCCESS) {
@@ -695,17 +692,19 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
         return s32Ret;
     }
     
-    // s32Ret = ss_mpi_vi_enable_chn(ViPipe, ViChn);
-    // if (s32Ret != TD_SUCCESS)
-    // {
-    //     LOGGER_ERROR(HIMPP, "vi enable chn failed with %#x!", s32Ret);
-    //     return s32Ret;
-    // }
+    s32Ret = ss_mpi_vi_enable_chn(ViPipe, ViChn);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "vi enable chn failed with %#x!", s32Ret);
+        return s32Ret;
+    }
 
     ss_mpi_vi_get_pipe_3dnr_attr(ViPipe, &dnr_attr);
     
     dnr_attr.enable = TD_TRUE;
     dnr_attr.compress_mode = OT_COMPRESS_MODE_FRAME;
+    dnr_attr.nr_type = OT_NR_TYPE_VIDEO_NORM;
+    dnr_attr.nr_motion_mode = OT_NR_MOTION_MODE_NORM;
     s32Ret = ss_mpi_vi_set_pipe_3dnr_attr(ViPipe, &dnr_attr);
     if (s32Ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP,"vi pipe(%d) set 3dnr_attr failed!", ViPipe);
@@ -732,6 +731,9 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
         {TD_FALSE, {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT}}
     };
 
+    ot_isp_sns_commbus uSnsBusInfo = {};
+    uSnsBusInfo.i2c_dev = 0;
+
     // register sensor
     ot_isp_sns_obj* pstSnsObj = sc4336p_get_obj();
     if( pstSnsObj == TD_NULL )
@@ -746,6 +748,14 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
         return TD_FAILURE;
     }
     pstSnsObj->pfn_register_callback(ViPipe, &stAeLib, &stAwbLib);
+
+    // set_bus_info
+    if( pstSnsObj->pfn_set_bus_info == TD_NULL )
+    {
+        LOGGER_ERROR(HIMPP, "pfn_set_bus_info is null!");
+        return TD_FAILURE;
+    }
+    pstSnsObj->pfn_set_bus_info(ViPipe, uSnsBusInfo);
 
     // ae register
     s32Ret = ss_mpi_ae_register(ViPipe, &stAeLib);
