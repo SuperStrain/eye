@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "logger.h"
 #include "video_process_hi.h"
+#include "test.h"
 
 void signal_handler(int sig) {
     std::cout << "Signal " << sig << " received" << std::endl;
@@ -18,6 +19,8 @@ int main() {
     loggerSpace::Logger::instance().init();
 
     hiMppMedia::videoProcessHi::getInstance().init();
+
+    test_main();
 
     pause();
 

@@ -71,12 +71,12 @@ private:
 
     static constexpr int VIDEO_STRETCH_WIDTH = 0;
     static constexpr int VIDEO_STRETCH_HEIGHT = 0;
-    static constexpr int VI_WIDTH = 1920;
-    static constexpr int VI_HEIGHT = 1080;
+    static constexpr int VI_WIDTH0 = SENSOR_MAX_WIDTH;
+    static constexpr int VI_HEIGHT0 = SENSOR_MAX_HEIGHT;
+    static constexpr int VI_WIDTH1 = 720;
+    static constexpr int VI_HEIGHT1 = 480;
 	static constexpr int IVP_SMD_W = 640;
 	static constexpr int IVP_SMD_H = 384;
-    static constexpr int SENSOR_MAX_WIDTH = maxWidth;
-    static constexpr int SENSOR_MAX_HEIGHT = maxHeight;
     static constexpr int SENSOR_FRAME_RATE = maxFrameRate;
     static constexpr const char* MIPI_DEV_NODE = "/dev/ot_mipi_rx";
     static constexpr bool rotateBSupport = false;
