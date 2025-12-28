@@ -631,7 +631,7 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
         .component_mask = {0xfff00000, 0x00000000},
         .scan_mode = OT_VI_SCAN_PROGRESSIVE,
         .ad_chn_id = { -1, -1, -1, -1 },
-        .data_seq = OT_VI_DATA_SEQ_YUYV,
+        .data_seq = OT_VI_DATA_SEQ_YVYU,
         .sync_cfg = {
             .vsync = OT_VI_VSYNC_FIELD,
             .vsync_neg = OT_VI_VSYNC_NEG_HIGH,
@@ -652,6 +652,7 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
         .isp_bypass = TD_FALSE,
         .size = {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
         .pixel_format = OT_PIXEL_FORMAT_RGB_BAYER_12BPP,
+        // .compress_mode = OT_COMPRESS_MODE_LINE,
         .compress_mode = OT_COMPRESS_MODE_NONE,
         .frame_rate_ctrl = {-1, -1}
     };
@@ -749,7 +750,7 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
         {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
         { SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT },
         30,
-        OT_ISP_BAYER_GBRG,
+        OT_ISP_BAYER_BGGR,
         OT_WDR_MODE_NONE,
         0, TD_FALSE, TD_FALSE,
         {TD_FALSE, {0, 0, SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT}}
