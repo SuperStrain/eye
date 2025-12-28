@@ -49,7 +49,7 @@ int videoProcessHi::init()
     ot_vpss_chn VpssChn = 0;
     ot_vi_pipe  ViPipe = 0;
     ot_vi_chn   ViChn  = 0;
-    td_bool     abChnEnable[OT_VPSS_MAX_PHYS_CHN_NUM] = {TD_TRUE, TD_TRUE, TD_FALSE};
+    td_bool     abChnEnable[OT_VPSS_MAX_PHYS_CHN_NUM] = {TD_TRUE, TD_TRUE, TD_TRUE};
 
     ret = hi_mpp_sys_init();
     if (ret != TD_SUCCESS) {
@@ -112,7 +112,7 @@ td_s32 videoProcessHi::hi_mpp_sys_init()
         stVbConf.common_pool[0].blk_cnt = 1;
         stVbConf.common_pool[0].blk_size = stVpssChnBufWrap.buf_size;
     } else {
-        //主码流 VI-offline-VPSS 2; VPSS-online-VENC 1; 修改分辨率时 VPSS-VGS-VENC 1;
+        // 主码流
         buf_attr.width = VI_WIDTH0;
         buf_attr.height = VI_HEIGHT0;
 		u64BlkSize = ot_common_get_pic_buf_size(&buf_attr);
@@ -120,16 +120,16 @@ td_s32 videoProcessHi::hi_mpp_sys_init()
         stVbConf.common_pool[0].blk_cnt = 3;      
     }
 
-    //次码流 VPSS-online-VENC 1; 多分一个帧率才稳定，没弄懂
+    // 次码流
     buf_attr.width = VI_WIDTH1;
     buf_attr.height = VI_HEIGHT1;
     u64BlkSize = ot_common_get_pic_buf_size(&buf_attr);
     stVbConf.common_pool[1].blk_size = u64BlkSize;
     stVbConf.common_pool[1].blk_cnt = 2;
    
-    //移动侦测&智能分析 1;
-    buf_attr.width = IVP_SMD_W;
-    buf_attr.height = IVP_SMD_H;
+    // 算法使用
+    buf_attr.width = VI_WIDTH2;
+    buf_attr.height = VI_HEIGHT2;
     u64BlkSize = ot_common_get_pic_buf_size(&buf_attr);
     stVbConf.common_pool[2].blk_size = u64BlkSize;
     stVbConf.common_pool[2].blk_cnt = 2;
@@ -211,10 +211,10 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
 
     int resList[][2] = {
             {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
-    		{VI_WIDTH0, VI_HEIGHT0},
-    		{VI_WIDTH1, VI_HEIGHT1},
-    		{352,      288     },
-    		{400,      224     },
+            {VI_WIDTH0, VI_HEIGHT0},
+            {VI_WIDTH1, VI_HEIGHT1},
+            {VI_WIDTH2, VI_HEIGHT2},
+            {400,      224     },
     };
 
     // create vpss group
@@ -234,7 +234,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     ot_vpss_chn_attr stVpssChnAttr[OT_VPSS_MAX_PHYS_CHN_NUM] = { };
     ot_vpss_chn VpssChn;
     // the first stream, enable vpss channel 0
-    VpssChn = vpssChn1;
+    VpssChn = vpssChn0;
     stVpssChnAttr[VpssChn].chn_mode      = OT_VPSS_CHN_MODE_USER;
     stVpssChnAttr[VpssChn].width       = resList[1][0];
     stVpssChnAttr[VpssChn].height      = resList[1][1];
@@ -260,12 +260,36 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     }    
 
     // the second stream, enable vpss channel 1
-    VpssChn = vpssChn2;
+    VpssChn = vpssChn1;
     stVpssChnAttr[VpssChn].chn_mode     = OT_VPSS_CHN_MODE_USER;
     stVpssChnAttr[VpssChn].width      = resList[2][0];
     stVpssChnAttr[VpssChn].height     = resList[2][1];
     stVpssChnAttr[VpssChn].video_format = OT_VIDEO_FORMAT_LINEAR;
-    stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;//SAMPLE_PIXEL_FORMAT;
+    stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
+    stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
+    stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
+    stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
+    stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
+    stVpssChnAttr[VpssChn].depth = 2;
+    stVpssChnAttr[VpssChn].aspect_ratio.mode = OT_ASPECT_RATIO_NONE;
+    s32Ret = enable_vpss_chn(VpssGrp, VpssChn, &stVpssChnAttr[VpssChn], TD_NULL);
+    if (TD_SUCCESS != s32Ret)
+    {
+        LOGGER_ERROR(HIMPP, "Enable vpss chn %d failed!", VpssChn);
+        abChnEnable[VpssChn] = TD_FALSE;
+        return s32Ret;
+    } else {
+        abChnEnable[VpssChn] = TD_TRUE;
+    }
+
+    VpssChn = vpssChn2;
+    stVpssChnAttr[VpssChn].chn_mode     = OT_VPSS_CHN_MODE_USER;
+    stVpssChnAttr[VpssChn].width      = resList[3][0];
+    stVpssChnAttr[VpssChn].height     = resList[3][1];
+    stVpssChnAttr[VpssChn].video_format = OT_VIDEO_FORMAT_LINEAR;
+    stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
     stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
