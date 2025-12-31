@@ -81,6 +81,8 @@ int videoProcessHi::init()
 
     // mdetect_init_ivp 移动侦测？
 
+    // venc module
+
 Release:
     return ret;
 }
@@ -246,7 +248,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;	
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
-    stVpssChnAttr[VpssChn].depth = 2;
+    stVpssChnAttr[VpssChn].depth = 0;
     stVpssChnAttr[VpssChn].aspect_ratio.mode = OT_ASPECT_RATIO_NONE;
     
     s32Ret = enable_vpss_chn(VpssGrp, VpssChn, &stVpssChnAttr[VpssChn], TD_NULL);
@@ -272,7 +274,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
-    stVpssChnAttr[VpssChn].depth = 2;
+    stVpssChnAttr[VpssChn].depth = 0;
     stVpssChnAttr[VpssChn].aspect_ratio.mode = OT_ASPECT_RATIO_NONE;
     s32Ret = enable_vpss_chn(VpssGrp, VpssChn, &stVpssChnAttr[VpssChn], TD_NULL);
     if (TD_SUCCESS != s32Ret)
