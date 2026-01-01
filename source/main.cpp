@@ -24,7 +24,7 @@ int main() {
 
     pause();
 
-    loggerSpace::Logger::instance().fini();
+    // loggerSpace::Logger::instance().fini();
 
     std::cout << "eye exiting..." << std::endl;
     sleep(1);
