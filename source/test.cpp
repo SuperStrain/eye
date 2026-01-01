@@ -10,7 +10,7 @@
 #include <ss_mpi_sys_mem.h>
 
 ot_vpss_grp g_vpssGrp = 0;
-ot_vpss_chn g_vpssChn = 1;
+ot_vpss_chn g_vpssChn = hiMppMedia::vpssChn2;
 
 static td_s32 SAMPLE_COMM_VPSS_EnableChn_Md(ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn, 
                                                   ot_vpss_chn_attr *pstVpssChnAttr,
