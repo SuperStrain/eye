@@ -745,7 +745,7 @@ td_s32 videoProcessHi::comm_vi_create_vi(ot_vi_dev ViDev, ot_vi_pipe ViPipe, ot_
 
 td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
 {
-    td_s32 s32Ret;
+    td_s32 s32Ret = TD_SUCCESS;
     ot_isp_3a_alg_lib stAeLib = { ViPipe, OT_AE_LIB_NAME };
     ot_isp_3a_alg_lib stAwbLib = { ViPipe, OT_AWB_LIB_NAME };
     ot_isp_pub_attr stPubAttr = {
@@ -760,6 +760,13 @@ td_s32 videoProcessHi::comm_vi_create_isp(ot_vi_pipe ViPipe)
 
     ot_isp_sns_commbus uSnsBusInfo = {};
     uSnsBusInfo.i2c_dev = 0;
+
+    s32Ret = ss_mpi_isp_exit(ViPipe);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "ss_mpi_isp_exit failed with %#x!", s32Ret);
+        return TD_FAILURE;
+    }
 
     // register sensor
     ot_isp_sns_obj* pstSnsObj = sc4336p_get_obj();
