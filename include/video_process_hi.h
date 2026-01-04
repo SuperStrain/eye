@@ -5,6 +5,7 @@
 #include <ot_type.h>
 #include <thread>
 #include "global_constants.h"
+#include <memory>
 
 namespace hiMppMedia {
 class videoProcessHi
@@ -22,6 +23,8 @@ public:
     }
 
     int init();
+
+    int deinit();
 
 private:
 
@@ -73,20 +76,38 @@ private:
     td_s32 vpss_stop(ot_vpss_grp VpssGrp, td_bool* pabChnEnable);
 
     /* venc module */
+    td_s32 venc_start_encode(ot_vpss_grp VpssGrp);
+
+public:
+
+    static constexpr int vpssChn0 = 0;
+    static constexpr int vpssChn1 = 1;
+    static constexpr int vpssChn2 = 2;
+
+    static constexpr int maxFrameRate = 30;
+    static constexpr int SENSOR_MAX_WIDTH = 2560;
+    static constexpr int SENSOR_MAX_HEIGHT = 1440;
 
 private:
 
     static constexpr int VIDEO_STRETCH_WIDTH = 0;
     static constexpr int VIDEO_STRETCH_HEIGHT = 0;
+    /* vpss主通道分辨率 */
     static constexpr int VI_WIDTH0 = SENSOR_MAX_WIDTH;
     static constexpr int VI_HEIGHT0 = SENSOR_MAX_HEIGHT;
-    static constexpr int VI_WIDTH1 = 720;
-    static constexpr int VI_HEIGHT1 = 480;
+    /* vpss次通道分辨率 */
+    static constexpr int VI_WIDTH1 = 1280;
+    static constexpr int VI_HEIGHT1 = 720;
+    /* vpss第三通道分辨率(算法) */
 	static constexpr int VI_WIDTH2 = 640;
 	static constexpr int VI_HEIGHT2 = 384;
+
     static constexpr int SENSOR_FRAME_RATE = maxFrameRate;
     static constexpr const char* MIPI_DEV_NODE = "/dev/ot_mipi_rx";
     static constexpr bool rotateBSupport = false;
+
+    struct videoImpl;
+    std::unique_ptr<videoImpl> impl_;
 
     bool wrap_enable;   // 低延时卷绕模式，300w和400w分辨率时使用
     bool video_stretch_enable;  // 200W拉伸为300W

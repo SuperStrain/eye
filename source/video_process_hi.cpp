@@ -26,12 +26,576 @@
 #include <ss_mpi_vpss.h>
 #include <ss_mpi_sys_bind.h>
 #include <sensor/sc4336p/sc4336p_cmos.h>
-
-
+#include <ot_common_venc.h>
+#include <ss_mpi_venc.h>
+#include "video_venc_hi.h"
 namespace hiMppMedia {
 
+struct videoProcessHi::videoImpl {
+
+public:
+
+enum class rc_mode {
+    RC_ABR = 0,
+    RC_CBR,
+    RC_VBR,
+    RC_AVBR,
+    RC_CVBR,
+    RC_QVBR,
+    RC_QPMAP,
+    RC_FIXQP
+};
+
+struct venc_chn_param {
+    td_u32 frame_rate;
+    td_u32 stats_time;
+    td_u32 gop;
+    ot_pic_size size;   /* 分辨率枚举值 */
+    ot_size venc_size;  /* 实际分辨率 */
+    td_u32 profile;
+    td_bool is_rcn_ref_share_buf;
+    ot_venc_gop_attr gop_attr;
+    ot_payload_type type;
+    rc_mode rc_mode_;
+};
+
+private:
+
+    enum class Pay_load_type {
+        PAYLOAD_TYPE_H264 = 0,
+        PAYLOAD_TYPE_H265,
+        PAYLOAD_TYPE_MJPEG,
+        PAYLOAD_TYPE_MAX
+    };
+
+public:
+
+    td_s32 comm_venc_get_gop_attr(ot_venc_gop_mode gop_mode, ot_venc_gop_attr *gop_attr);
+
+    td_s32 comm_venc_mini_buf_en();
+
+    td_s32 venc_set_video_param(venc_chn_param* venc_param, td_u32 chn_num, ot_venc_gop_attr gop_attr);
+
+    td_s32 comm_venc_start(ot_venc_chn venc_chn, venc_chn_param *chn_param);
+
+    td_s32 bind_vpss_venc(ot_vpss_grp vpss_grp, ot_vpss_chn vpss_chn, ot_venc_chn venc_chn);
+
+private:
+
+    td_s32 comm_venc_set_mod_type(Pay_load_type payload_type, ot_venc_mod_param *mod_param);
+
+    td_s32 comm_venc_set_mini_buf(Pay_load_type payload_type, ot_venc_mod_param *mod_param);
+
+    td_s32 comm_venc_create(ot_venc_chn venc_chn, venc_chn_param *chn_param);
+
+    td_s32 comm_venc_channel_param_init(venc_chn_param *chn_param, ot_venc_chn_attr *chn_attr);
+
+    /* set venc param */
+    td_s32 comm_venc_h265_param_init(ot_venc_chn_attr *chn_attr, venc_chn_param *chn_param);
+    td_s32 comm_venc_h264_param_init(ot_venc_chn_attr *chn_attr, venc_chn_param *chn_param);
+    td_s32 comm_venc_mjpeg_param_init(ot_venc_chn_attr *chn_attr, venc_chn_param *chn_param);
+
+    td_void comm_venc_set_gop_attr(ot_payload_type type, ot_venc_chn_attr *chn_attr,
+    ot_venc_gop_attr *gop_attr);
+
+    td_s32 comm_venc_close_reencode(ot_venc_chn venc_chn);
+
+public:
+
+    static constexpr int venc_chn_num = 3;
+    static constexpr int venc_chn0 = 0; // 主码流
+    static constexpr int venc_chn1 = 1; // 次码流
+    static constexpr int venc_chn2 = 2; // mjpeg
+
+    static constexpr int frame_buf_ratio_default = 75;
+};
+
+td_s32 videoProcessHi::videoImpl::bind_vpss_venc(ot_vpss_grp vpss_grp, ot_vpss_chn vpss_chn, ot_venc_chn venc_chn)
+{
+    ot_mpp_chn src_chn;
+    ot_mpp_chn dest_chn;
+
+    src_chn.mod_id = OT_ID_VPSS;
+    src_chn.dev_id = vpss_grp;
+    src_chn.chn_id = vpss_chn;
+
+    dest_chn.mod_id = OT_ID_VENC;
+    dest_chn.dev_id = 0;
+    dest_chn.chn_id = venc_chn;
+
+    td_s32 ret = ss_mpi_sys_bind(&src_chn, &dest_chn);
+    if(ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "bind vpss grp %d chn %d to venc chn %d failed", vpss_grp, vpss_chn, venc_chn);
+        return TD_FAILURE;
+    }
+
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_h265_param_init(ot_venc_chn_attr *chn_attr, venc_chn_param *chn_param)
+{    
+    rc_mode rc_mode = chn_param->rc_mode_;
+    td_u32 gop = chn_param->gop;
+    td_u32 stats_time = chn_param->stats_time;
+    td_u32 frame_rate = chn_param->frame_rate;
+    ot_pic_size size = chn_param->size;
+    video_venc_hi videoVencHi;
+
+    chn_attr->venc_attr.h265_attr.frame_buf_ratio = frame_buf_ratio_default;
+    if (rc_mode == rc_mode::RC_ABR) {
+        videoVencHi.comm_venc_h265_abr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_CBR) {
+        videoVencHi.comm_venc_h265_cbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_FIXQP) {
+        videoVencHi.comm_venc_h265_fixqp_param_init(chn_attr, gop, frame_rate);
+    } else if (rc_mode == rc_mode::RC_VBR) {
+        videoVencHi.comm_venc_h265_vbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_AVBR) {
+        videoVencHi.comm_venc_h265_avbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_CVBR) {
+        videoVencHi.comm_venc_h265_cvbr_param_init(chn_attr, gop, stats_time, frame_rate, size);
+    } else if (rc_mode == rc_mode::RC_QVBR) {
+        videoVencHi.comm_venc_h265_qvbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_QPMAP) {
+        videoVencHi.comm_venc_h265_qpmap_param_init(chn_attr, gop, frame_rate, stats_time);
+    } else {
+        LOGGER_ERROR(HIMPP, "rc_mode(%d) not support", rc_mode);
+        return TD_FAILURE;
+    }
+    chn_attr->venc_attr.h265_attr.rcn_ref_share_buf_en = chn_param->is_rcn_ref_share_buf;
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_h264_param_init(ot_venc_chn_attr *chn_attr, venc_chn_param *chn_param)
+{
+    rc_mode rc_mode = chn_param->rc_mode_;
+    td_u32 gop = chn_param->gop;
+    td_u32 stats_time = chn_param->stats_time;
+    td_u32 frame_rate = chn_param->frame_rate;
+    ot_pic_size size = chn_param->size;
+    video_venc_hi videoVencHi;
+
+    chn_attr->venc_attr.h264_attr.frame_buf_ratio = frame_buf_ratio_default;
+    if (rc_mode == rc_mode::RC_ABR) {
+        videoVencHi.comm_venc_h264_abr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_CBR) {
+        videoVencHi.comm_venc_h264_cbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_FIXQP) {
+        videoVencHi.comm_venc_h264_fixqp_param_init(chn_attr, gop, frame_rate);
+    } else if (rc_mode == rc_mode::RC_VBR) {
+        videoVencHi.comm_venc_h264_vbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_AVBR) {
+        videoVencHi.comm_venc_h264_avbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_CVBR) {
+        videoVencHi.comm_venc_h264_cvbr_param_init(chn_attr, gop, stats_time, frame_rate, size);
+    } else if (rc_mode == rc_mode::RC_QVBR) {
+        videoVencHi.comm_venc_h264_qvbr_param_init(chn_attr, gop, stats_time, frame_rate);
+    } else if (rc_mode == rc_mode::RC_QPMAP) {
+        videoVencHi.comm_venc_h264_qpmap_param_init(chn_attr, gop, frame_rate, stats_time);
+    } else {
+        LOGGER_ERROR(HIMPP, "rc_mode(%d) not support", rc_mode);
+        return TD_FAILURE;
+    }
+    chn_attr->venc_attr.h264_attr.rcn_ref_share_buf_en = chn_param->is_rcn_ref_share_buf;
+
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_mjpeg_param_init(ot_venc_chn_attr *chn_attr, venc_chn_param *chn_param)
+{
+    rc_mode rc_mode = chn_param->rc_mode_;
+    td_u32 stats_time = chn_param->stats_time;
+    td_u32 frame_rate = chn_param->frame_rate;
+    video_venc_hi videoVencHi;
+
+    if (rc_mode == rc_mode::RC_FIXQP) {
+        videoVencHi.comm_venc_mjpeg_fixqp_param_init(chn_attr, frame_rate);
+    } else if (rc_mode == rc_mode::RC_CBR) {
+        videoVencHi.comm_venc_mjpeg_cbr_param_init(chn_attr, stats_time, frame_rate);
+    } else if ((rc_mode == rc_mode::RC_VBR) || (rc_mode == rc_mode::RC_AVBR)) {
+        if (rc_mode == rc_mode::RC_AVBR) {
+            LOGGER_NOTICE(HIMPP, "mjpege not support AVBR, so change rcmode to VBR!");
+        }
+        videoVencHi.comm_venc_mjpeg_vbr_param_init(chn_attr, stats_time, frame_rate);
+    } else {
+        LOGGER_ERROR(HIMPP, "can't support other mode(%d) in this version!", rc_mode);
+        return TD_FAILURE;
+    }
+    return TD_SUCCESS;
+}
+
+td_void videoProcessHi::videoImpl::comm_venc_set_gop_attr(ot_payload_type type, ot_venc_chn_attr *chn_attr,
+ot_venc_gop_attr *gop_attr)
+{
+    if (type == OT_PT_MJPEG || type == OT_PT_JPEG) {
+        chn_attr->gop_attr.gop_mode = OT_VENC_GOP_MODE_NORMAL_P;
+        chn_attr->gop_attr.normal_p.ip_qp_delta = 0;
+    } else {
+        chn_attr->gop_attr = *gop_attr;
+        if ((gop_attr->gop_mode == OT_VENC_GOP_MODE_BIPRED_B) && (type == OT_PT_H264)) {
+            if (chn_attr->venc_attr.profile == 0) {
+                chn_attr->venc_attr.profile = 1;
+                LOGGER_NOTICE(HIMPP, "H.264 base profile not support BIPREDB, so change profile to main profile!");
+            }
+        }
+    }  
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_channel_param_init(venc_chn_param *chn_param, ot_venc_chn_attr *chn_attr)
+{
+    td_s32 s32Ret = TD_SUCCESS;
+    ot_venc_gop_attr *gop_attr = &chn_param->gop_attr;
+    td_u32 profile = chn_param->profile;
+    ot_payload_type type = chn_param->type;
+    ot_size venc_size = chn_param->venc_size;
+
+    chn_attr->venc_attr.type = type;
+    chn_attr->venc_attr.max_pic_width = venc_size.width;
+    chn_attr->venc_attr.max_pic_height = venc_size.height;
+    chn_attr->venc_attr.pic_width = venc_size.width;   /* the picture width */
+    chn_attr->venc_attr.pic_height = venc_size.height; /* the picture height */
+
+    if (type == OT_PT_MJPEG || type == OT_PT_JPEG) {
+        chn_attr->venc_attr.buf_size =
+            OT_ALIGN_UP(venc_size.width, 16) * OT_ALIGN_UP(venc_size.height, 16) * 4; /* 16 4 is a number */
+    } else {
+        chn_attr->venc_attr.buf_size =
+            OT_ALIGN_UP(venc_size.width * venc_size.height * 3 / 4, 64); /*  3  4 64 is a number */
+    }
+    chn_attr->venc_attr.profile = profile;
+    chn_attr->venc_attr.is_by_frame = TD_TRUE; /* get stream mode is slice mode or frame mode? */
+
+    if (gop_attr->gop_mode == OT_VENC_GOP_MODE_SMART_P) {
+        chn_param->stats_time = gop_attr->smart_p.bg_interval / chn_param->gop;
+    }
+
+    switch (type) {
+        case OT_PT_H265:
+            s32Ret = comm_venc_h265_param_init(chn_attr, chn_param);
+            break;
+
+        case OT_PT_H264:
+            s32Ret = comm_venc_h264_param_init(chn_attr, chn_param);
+            break;
+
+        case OT_PT_MJPEG:
+            s32Ret = comm_venc_mjpeg_param_init(chn_attr, chn_param);
+            break;
+
+        case OT_PT_JPEG:
+            // s32Ret = comm_venc_jpeg_param_init(chn_attr);
+            LOGGER_ERROR(HIMPP, "can't support this type (%d) in this version!", type);
+            break;
+
+        case OT_PT_SVAC3:
+            // s32Ret = comm_venc_svac3_param_init(chn_attr, chn_param);
+            LOGGER_ERROR(HIMPP, "can't support this type (%d) in this version!", type);
+            break;
+
+        default:
+            LOGGER_ERROR(HIMPP, "can't support this type (%d) in this version!", type);
+            return OT_ERR_VENC_NOT_SUPPORT;
+    }
+
+    comm_venc_set_gop_attr(type, chn_attr, gop_attr);
+
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_close_reencode(ot_venc_chn venc_chn)
+{
+    td_s32 ret;
+    ot_venc_rc_param rc_param;
+    ot_venc_chn_attr chn_attr;
+
+    ret = ss_mpi_venc_get_chn_attr(venc_chn, &chn_attr);
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "GetChnAttr failed! ret=%#x", ret);
+        return TD_FAILURE;
+    }
+
+    ret = ss_mpi_venc_get_rc_param(venc_chn, &rc_param);
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "GetRcParam failed! ret=%#x", ret);
+        return TD_FAILURE;
+    }
+
+    if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_ABR) {
+        rc_param.h264_abr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_CBR) {
+        rc_param.h264_cbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_VBR) {
+        rc_param.h264_vbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_AVBR) {
+        rc_param.h264_avbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_QVBR) {
+        rc_param.h264_qvbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_CVBR) {
+        rc_param.h264_cvbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H265_ABR) {
+        rc_param.h265_abr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H265_CBR) {
+        rc_param.h265_cbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H265_VBR) {
+        rc_param.h265_vbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H265_AVBR) {
+        rc_param.h265_avbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H265_QVBR) {
+        rc_param.h265_qvbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H265_CVBR) {
+        rc_param.h265_cvbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_SVAC3_ABR) {
+        rc_param.svac3_abr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_SVAC3_CBR) {
+        rc_param.svac3_cbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_SVAC3_VBR) {
+        rc_param.svac3_vbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_SVAC3_AVBR) {
+        rc_param.svac3_avbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_SVAC3_QVBR) {
+        rc_param.svac3_qvbr_param.max_reencode_times = 0;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_SVAC3_CVBR) {
+        rc_param.svac3_cvbr_param.max_reencode_times = 0;
+    } else {
+        return TD_SUCCESS;
+    }
+
+    ret = ss_mpi_venc_set_rc_param(venc_chn, &rc_param);
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "SetRcParam failed! ret=%#x", ret);
+        return TD_FAILURE;
+    }
+
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_create(ot_venc_chn venc_chn, venc_chn_param *chn_param)
+{
+    td_s32 s32Ret = TD_SUCCESS;
+    ot_venc_chn_attr venc_chn_attr = {};
+
+    /* 分辨率枚举值转实际值 */
+    if(chn_param->size >= PIC_BUTT) {
+        LOGGER_ERROR(HIMPP, "comm_venc_create invalid pic size %d", chn_param->size);
+        return TD_FAILURE;
+    }
+    chn_param->venc_size.height = pic_size_array[chn_param->size].height;
+    chn_param->venc_size.width = pic_size_array[chn_param->size].width;
+
+    /* step 1:  create venc channel */
+    if ((s32Ret = comm_venc_channel_param_init(chn_param, &venc_chn_attr)) != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "venc_channel_param_init failed!");
+        return s32Ret;
+    }
+
+    if ((s32Ret = ss_mpi_venc_create_chn(venc_chn, &venc_chn_attr)) != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "ss_mpi_venc_create_chn [%d] failed with %#x! ===", venc_chn, s32Ret);
+        return s32Ret;
+    }
+
+    if (chn_param->type == OT_PT_JPEG) {
+        return TD_SUCCESS;
+    }
+
+    if ((s32Ret = comm_venc_close_reencode(venc_chn)) != TD_SUCCESS) {
+        ss_mpi_venc_destroy_chn(venc_chn);
+        return s32Ret;
+    }
+
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_start(ot_venc_chn venc_chn, venc_chn_param *chn_param)
+{
+    td_s32 s32Ret = TD_SUCCESS;
+    ot_venc_start_param start_param = {};
+
+    /* step 1: create encode chnl */
+    if ((s32Ret = comm_venc_create(venc_chn, chn_param)) != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "sample_comm_venc_create failed with%#x!", s32Ret);
+        return TD_FAILURE;
+    }
+    /* step 2:  start recv venc pictures */
+    start_param.recv_pic_num = -1;
+    if ((s32Ret = ss_mpi_venc_start_chn(venc_chn, &start_param)) != TD_SUCCESS) {
+        ss_mpi_venc_destroy_chn(venc_chn);
+        LOGGER_ERROR(HIMPP,"ss_mpi_venc_start_recv_pic failed with%#x!", s32Ret);
+        return TD_FAILURE;
+    }
+
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_get_gop_attr(ot_venc_gop_mode gop_mode, ot_venc_gop_attr *gop_attr)
+{
+    switch (gop_mode) {
+        case OT_VENC_GOP_MODE_NORMAL_P:
+            gop_attr->gop_mode = OT_VENC_GOP_MODE_NORMAL_P;
+            gop_attr->normal_p.ip_qp_delta = 2; /* 2 is a number */
+            break;
+
+        case OT_VENC_GOP_MODE_SMART_P:
+            gop_attr->gop_mode = OT_VENC_GOP_MODE_SMART_P;
+            gop_attr->smart_p.bg_qp_delta = 4;  /* 4 is a number */
+            gop_attr->smart_p.vi_qp_delta = 2;  /* 2 is a number */
+            gop_attr->smart_p.bg_interval = 180; /* 180 is a number */
+            break;
+
+        case OT_VENC_GOP_MODE_SMART_CRR:
+            gop_attr->gop_mode = OT_VENC_GOP_MODE_SMART_CRR;
+            gop_attr->smart_crr.bg_qp_delta = 10;   /* 10: bg_qp_delta */
+            gop_attr->smart_crr.vi_qp_delta = 3;    /* 3: vi_qp_delta */
+            gop_attr->smart_crr.bg_interval = 300;  /* 300: bg_interval */
+            gop_attr->smart_crr.crr_split_num = 4;  /* 4: crr_split_num */
+            gop_attr->smart_crr.crr_delay_num = 0;
+            gop_attr->smart_crr.strategy = OT_VENC_CRR_RECODE_DISABLE;
+            break;
+
+        case OT_VENC_GOP_MODE_DUAL_P:
+            gop_attr->gop_mode = OT_VENC_GOP_MODE_DUAL_P;
+            gop_attr->dual_p.ip_qp_delta = 4; /* 4 is a number */
+            gop_attr->dual_p.sp_qp_delta = 2; /* 2 is a number */
+            gop_attr->dual_p.sp_interval = 3; /* 3 is a number */
+            break;
+
+        case OT_VENC_GOP_MODE_BIPRED_B:
+            gop_attr->gop_mode = OT_VENC_GOP_MODE_BIPRED_B;
+            gop_attr->bipred_b.b_qp_delta = -2; /* -2 is a number */
+            gop_attr->bipred_b.ip_qp_delta = 3; /* 3 is a number */
+            gop_attr->bipred_b.b_frame_num = 2; /* 2 is a number */
+            break;
+
+        default:
+            LOGGER_ERROR(HIMPP, "not support the gop mode !");
+            return TD_FAILURE;
+    }
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_param, td_u32 chn_num, ot_venc_gop_attr gop_attr)
+{
+    if(chn_num <= venc_chn2) {
+        LOGGER_ERROR(HIMPP, "venc_set_video_param invalid chn num %u", chn_num);
+        return TD_FAILURE;
+    }
+
+    /* encode chn0 */
+    ot_pic_size venc_chn0_size[3] ={
+        PIC_2560X1440,
+        PIC_2304X1296,
+        PIC_1080P
+    };
+    venc_param[venc_chn0].frame_rate = maxFrameRate;
+    venc_param[venc_chn0].gop = 60;
+    venc_param[venc_chn0].stats_time = 2;
+    venc_param[venc_chn0].gop_attr = gop_attr;
+    venc_param[venc_chn0].type = OT_PT_H265;
+    venc_param[venc_chn0].size = venc_chn0_size[0];
+    venc_param[venc_chn0].rc_mode_ = rc_mode::RC_CBR;
+    venc_param[venc_chn0].profile = 0;
+    venc_param[venc_chn0].is_rcn_ref_share_buf = TD_TRUE;
+
+    /* encode chn1 */
+    ot_pic_size venc_chn1_size[3] ={
+        PIC_720P,
+        PIC_360P,
+        PIC_CIF
+    };
+    venc_param[venc_chn1].frame_rate = maxFrameRate;
+    venc_param[venc_chn1].gop = 60;
+    venc_param[venc_chn1].stats_time = 2;
+    venc_param[venc_chn1].gop_attr = gop_attr;
+    venc_param[venc_chn1].type = OT_PT_H264;
+    venc_param[venc_chn1].size = venc_chn1_size[0];
+    venc_param[venc_chn1].rc_mode_ = rc_mode::RC_CBR;
+    venc_param[venc_chn1].profile = 0;
+    venc_param[venc_chn1].is_rcn_ref_share_buf = TD_TRUE;
+
+    /* encode chn2 MJPEG */
+    venc_param[venc_chn2].frame_rate = 20; // 减小cpu压力
+    venc_param[venc_chn2].gop = 60;
+    venc_param[venc_chn2].stats_time = 2;
+    venc_param[venc_chn2].gop_attr = gop_attr;
+    venc_param[venc_chn2].type = OT_PT_MJPEG;
+    venc_param[venc_chn2].size = venc_chn1_size[1];
+    venc_param[venc_chn2].rc_mode_ = rc_mode::RC_CBR;
+    venc_param[venc_chn2].profile = 0;
+    venc_param[venc_chn2].is_rcn_ref_share_buf = TD_TRUE;
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_set_mod_type(Pay_load_type payload_type, ot_venc_mod_param *mod_param)
+{
+    switch (payload_type) {
+        case Pay_load_type::PAYLOAD_TYPE_H264:
+            mod_param->mod_type = OT_VENC_MOD_H264;
+            break;
+        case Pay_load_type::PAYLOAD_TYPE_H265:
+            mod_param->mod_type = OT_VENC_MOD_H265;
+            break;
+        case Pay_load_type::PAYLOAD_TYPE_MJPEG:
+            mod_param->mod_type = OT_VENC_MOD_JPEG;
+            break;
+        default:
+            return TD_FAILURE;
+    }
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_set_mini_buf(Pay_load_type payload_type, ot_venc_mod_param *mod_param)
+{
+    switch (payload_type) {
+        case Pay_load_type::PAYLOAD_TYPE_H264:
+            mod_param->h264_mod_param.mini_buf_mode = 1;
+            break;
+        case Pay_load_type::PAYLOAD_TYPE_H265:
+            mod_param->h265_mod_param.mini_buf_mode = 1;
+            break;
+        case Pay_load_type::PAYLOAD_TYPE_MJPEG:
+            mod_param->jpeg_mod_param.mini_buf_mode = 1;
+            break;
+        default:
+            return TD_FAILURE;
+    }
+    return TD_SUCCESS;
+}
+
+td_s32 videoProcessHi::videoImpl::comm_venc_mini_buf_en()
+{
+    td_s32 s32Ret = TD_SUCCESS;
+    ot_venc_mod_param mod_param = { };
+    for(int i = 0; i < static_cast<int>(Pay_load_type::PAYLOAD_TYPE_MAX); i++) {
+        s32Ret = comm_venc_set_mod_type(static_cast<Pay_load_type>(i), &mod_param);
+        if (s32Ret != TD_SUCCESS) {
+            LOGGER_ERROR(HIMPP, "comm_venc_set_mod_type failed!");
+            return TD_FAILURE;
+        }
+
+        s32Ret = ss_mpi_venc_get_mod_param(&mod_param);
+        if (s32Ret != TD_SUCCESS) {
+            LOGGER_ERROR(HIMPP, "ss_mpi_venc_get_mod_param failed with %#x!", s32Ret);
+            return TD_FAILURE;
+        }
+
+        s32Ret = comm_venc_set_mini_buf(static_cast<Pay_load_type>(i), &mod_param);
+        if (s32Ret != TD_SUCCESS) {
+            LOGGER_ERROR(HIMPP, "comm_venc_set_mini_buf failed!");
+            return TD_FAILURE;
+        }
+
+        s32Ret = ss_mpi_venc_set_mod_param(&mod_param);
+        if (s32Ret != TD_SUCCESS) {
+            LOGGER_ERROR(HIMPP, "ss_mpi_venc_set_mod_param failed with %#x!", s32Ret);
+            return TD_FAILURE;
+        }            
+
+    }
+
+    return s32Ret;
+}
+
 videoProcessHi::videoProcessHi() : stVpssChnBufWrap({}), wrap_enable(false), 
-video_stretch_enable(false)
+video_stretch_enable(false), impl_(new videoImpl())
 {
 
 }
@@ -46,7 +610,6 @@ int videoProcessHi::init()
     int ret = TD_SUCCESS;
 
 	ot_vpss_grp VpssGrp = 0;
-    ot_vpss_chn VpssChn = 0;
     ot_vi_pipe  ViPipe = 0;
     ot_vi_chn   ViChn  = 0;
     td_bool     abChnEnable[OT_VPSS_MAX_PHYS_CHN_NUM] = {TD_TRUE, TD_TRUE, TD_TRUE};
@@ -71,7 +634,7 @@ int videoProcessHi::init()
     }
 
     // bind vi to vpss
-    ret = bind_vi_vpss(ViPipe, ViChn, VpssGrp, VpssChn);
+    ret = bind_vi_vpss(ViPipe, ViChn, VpssGrp, 0);
     if(ret != TD_SUCCESS) {
         LOGGER_ERROR(HIMPP, "bind vi to vpss failed, ret %d", ret);
         goto Release;
@@ -82,9 +645,20 @@ int videoProcessHi::init()
     // mdetect_init_ivp 移动侦测？
 
     // venc module
+    ret = venc_start_encode(VpssGrp);
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "venc_start_encode failed!");
+        goto Release;
+    }
 
 Release:
     return ret;
+}
+
+int videoProcessHi::deinit()
+{
+    // venc module deinit
+    return TD_SUCCESS;
 }
 
 td_s32 videoProcessHi::hi_mpp_sys_init()
@@ -215,8 +789,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
             {SENSOR_MAX_WIDTH, SENSOR_MAX_HEIGHT},
             {VI_WIDTH0, VI_HEIGHT0},
             {VI_WIDTH1, VI_HEIGHT1},
-            {VI_WIDTH2, VI_HEIGHT2},
-            {400,      224     },
+            {VI_WIDTH2, VI_HEIGHT2}
     };
 
     // create vpss group
@@ -1006,6 +1579,81 @@ td_s32 videoProcessHi::vpss_stop(ot_vpss_grp VpssGrp, td_bool* pabChnEnable)
     {
         LOGGER_ERROR(HIMPP, "failed with %#x!", s32Ret);
         return s32Ret;
+    }
+
+    return s32Ret;
+}
+
+td_s32 videoProcessHi::venc_start_encode(ot_vpss_grp VpssGrp)
+{
+    td_s32 s32Ret = TD_SUCCESS;
+    ot_venc_gop_mode gop_mode = OT_VENC_GOP_MODE_NORMAL_P;
+    ot_venc_gop_attr gop_attr = {};
+    s32Ret = impl_->comm_venc_get_gop_attr(gop_mode, &gop_attr);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "comm_venc_get_gop_attr failed!");
+        return TD_FAILURE;
+    }
+
+    s32Ret = impl_->comm_venc_mini_buf_en();
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "comm_venc_mini_buf_en failed!");
+        return TD_FAILURE;
+    }
+
+    videoImpl::venc_chn_param venc_chn_param[videoImpl::venc_chn_num] = {};
+    s32Ret = impl_->venc_set_video_param(venc_chn_param, videoImpl::venc_chn_num, gop_attr);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "venc_set_video_param failed!");
+        return TD_FAILURE;
+    }
+
+    // start venc channel 0
+    s32Ret = impl_->comm_venc_start(videoImpl::venc_chn0, &venc_chn_param[videoImpl::venc_chn0]);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "venc chn%d comm_venc_start failed!", videoImpl::venc_chn0);
+        return TD_FAILURE;
+    }
+
+    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn0, videoImpl::venc_chn0);
+    if(s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "bind_vpss_venc failed!");
+        return TD_FAILURE;
+    }
+
+   // start venc channel 1
+    s32Ret = impl_->comm_venc_start(videoImpl::venc_chn1, &venc_chn_param[videoImpl::venc_chn1]);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "venc chn%d comm_venc_start failed!", videoImpl::venc_chn1);
+        return TD_FAILURE;
+    }
+
+    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn1, videoImpl::venc_chn1);
+    if(s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "bind_vpss_venc failed!");
+        return TD_FAILURE;
+    }
+
+   // start venc channel 2
+    s32Ret = impl_->comm_venc_start(videoImpl::venc_chn2, &venc_chn_param[videoImpl::venc_chn2]);
+    if (s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "venc chn%d comm_venc_start failed!", videoImpl::venc_chn2);
+        return TD_FAILURE;
+    }
+
+    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn1, videoImpl::venc_chn2);
+    if(s32Ret != TD_SUCCESS)
+    {
+        LOGGER_ERROR(HIMPP, "bind_vpss_venc failed!");
+        return TD_FAILURE;
     }
 
     return s32Ret;
