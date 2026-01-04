@@ -8,9 +8,10 @@
 #include <thread>
 #include <unistd.h>
 #include <ss_mpi_sys_mem.h>
+#include "video_process_hi.h"
 
 ot_vpss_grp g_vpssGrp = 0;
-ot_vpss_chn g_vpssChn = hiMppMedia::vpssChn2;
+ot_vpss_chn g_vpssChn = hiMppMedia::videoProcessHi::vpssChn2;
 
 static td_s32 SAMPLE_COMM_VPSS_EnableChn_Md(ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn, 
                                                   ot_vpss_chn_attr *pstVpssChnAttr,
