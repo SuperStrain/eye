@@ -41,6 +41,8 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     message(FATAL_ERROR "Please use -DCMAKE_TOOLCHAIN_FILE=./aarch64-none-linux-gnu-toolchain.cmake")
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
 set (target_out ${PROJECT_NAME})
 set(HI_MPP_LIB
