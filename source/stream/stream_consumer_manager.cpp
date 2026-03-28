@@ -7,29 +7,29 @@ StreamConsumerManager& StreamConsumerManager::instance() {
 
 StreamConsumerManager::StreamConsumerManager() {
     distributors_[StreamType::VIDEO_MAIN] =
-        std::make_unique<StreamDistributor>(VencChannel::CHN0);
+        std::unique_ptr<StreamDistributor>(new StreamDistributor(VencChannel::CHN0));
     distributors_[StreamType::VIDEO_SUB] =
-        std::make_unique<StreamDistributor>(VencChannel::CHN1);
+        std::unique_ptr<StreamDistributor>(new StreamDistributor(VencChannel::CHN1));
     distributors_[StreamType::VIDEO_MJPEG] =
-        std::make_unique<StreamDistributor>(VencChannel::CHN2);
+        std::unique_ptr<StreamDistributor>(new StreamDistributor(VencChannel::CHN2));
 
     CodecType main_codec = CodecType::H265;
     CodecType sub_codec = CodecType::H264;
 
     fetchers_[StreamType::VIDEO_MAIN] =
-        std::make_unique<StreamFetcher>(
+        std::unique_ptr<StreamFetcher>(new StreamFetcher(
             VencChannel::CHN0, StreamType::VIDEO_MAIN, main_codec,
-            *distributors_[StreamType::VIDEO_MAIN]);
+            *distributors_[StreamType::VIDEO_MAIN]));
 
     fetchers_[StreamType::VIDEO_SUB] =
-        std::make_unique<StreamFetcher>(
+        std::unique_ptr<StreamFetcher>(new StreamFetcher(
             VencChannel::CHN1, StreamType::VIDEO_SUB, sub_codec,
-            *distributors_[StreamType::VIDEO_SUB]);
+            *distributors_[StreamType::VIDEO_SUB]));
 
     fetchers_[StreamType::VIDEO_MJPEG] =
-        std::make_unique<StreamFetcher>(
+        std::unique_ptr<StreamFetcher>(new StreamFetcher(
             VencChannel::CHN2, StreamType::VIDEO_MJPEG, CodecType::MJPEG,
-            *distributors_[StreamType::VIDEO_MJPEG]);
+            *distributors_[StreamType::VIDEO_MJPEG]));
 }
 
 uint32_t StreamConsumerManager::register_consumer(StreamType type,
@@ -44,13 +44,15 @@ void StreamConsumerManager::unregister_consumer(StreamType type,
 }
 
 void StreamConsumerManager::start_all() {
-    for (auto& [type, fetcher] : fetchers_) {
-        fetcher->start();
+    for (std::map<StreamType, std::unique_ptr<StreamFetcher> >::iterator it = fetchers_.begin();
+         it != fetchers_.end(); ++it) {
+        it->second->start();
     }
 }
 
 void StreamConsumerManager::stop_all() {
-    for (auto& [type, fetcher] : fetchers_) {
-        fetcher->stop();
+    for (std::map<StreamType, std::unique_ptr<StreamFetcher> >::iterator it = fetchers_.begin();
+         it != fetchers_.end(); ++it) {
+        it->second->stop();
     }
 }

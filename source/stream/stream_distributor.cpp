@@ -33,7 +33,7 @@ void StreamDistributor::remove_consumer(uint32_t id) {
     {
         std::lock_guard<std::mutex> lock(slots_mutex_);
         auto it = std::find_if(slots_.begin(), slots_.end(),
-            [id](const auto& s) { return s->consumer_id == id; });
+            [id](const std::shared_ptr<ConsumerSlot>& s) { return s->consumer_id == id; });
         if (it == slots_.end()) return;
         target = *it;
         slots_.erase(it);

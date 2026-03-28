@@ -2,6 +2,7 @@
 
 #include "stream_frame.h"
 #include "stream_common.h"
+#include <deque>
 #include <map>
 #include <vector>
 #include <memory>
