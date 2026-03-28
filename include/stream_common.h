@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _STREAM_COMMON_H_
+#define _STREAM_COMMON_H_
 
 #include <cstdint>
 #include <functional>
@@ -23,3 +24,5 @@ struct ConsumerConfig {
 class StreamFrame;
 using StreamFramePtr = std::shared_ptr<StreamFrame>;
 using ConsumerCallback = std::function<void(StreamFramePtr frame)>;
+
+#endif
