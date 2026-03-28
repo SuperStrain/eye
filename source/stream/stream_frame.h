@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _STREAM_FRAME_H_
+#define _STREAM_FRAME_H_
 
 #include "stream_common.h"
 #include <ot_common_venc.h>
@@ -32,3 +33,5 @@ private:
     std::vector<ot_venc_pack> pack_array_;
     std::vector<std::vector<uint8_t>> pack_buffers_;
 };
+
+#endif

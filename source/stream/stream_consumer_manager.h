@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _STREAM_CONSUMER_MANAGER_H_
+#define _STREAM_CONSUMER_MANAGER_H_
 
 #include "stream_fetcher.h"
 #include "stream_distributor.h"
@@ -22,3 +23,5 @@ private:
     std::map<StreamType, std::unique_ptr<StreamDistributor>> distributors_;
     std::map<StreamType, std::unique_ptr<StreamFetcher>> fetchers_;
 };
+
+#endif

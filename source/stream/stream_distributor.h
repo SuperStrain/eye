@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _STREAM_DISTRIBUTOR_H_
+#define _STREAM_DISTRIBUTOR_H_
 
 #include "stream_frame.h"
 #include "stream_common.h"
@@ -45,3 +46,5 @@ private:
     std::vector<std::shared_ptr<ConsumerSlot>> slots_;
     uint32_t next_consumer_id_ = 0;
 };
+
+#endif

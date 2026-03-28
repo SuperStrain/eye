@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _RECORDER_CONSUMER_H_
+#define _RECORDER_CONSUMER_H_
 
 #include "stream_frame.h"
 #include "stream_common.h"
@@ -36,3 +37,5 @@ private:
     std::atomic<uint64_t> dropped_{0};
     std::atomic<uint64_t> consumed_{0};
 };
+
+#endif
