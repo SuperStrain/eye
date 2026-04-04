@@ -1,10 +1,10 @@
-#ifndef _STREAM_DISTRIBUTOR_H_
-#define _STREAM_DISTRIBUTOR_H_
+#ifndef STREAM_DISTRIBUTOR_H
+#define STREAM_DISTRIBUTOR_H
 
 #include "stream_frame.h"
 #include "stream_common.h"
+#include <cstdint>
 #include <deque>
-#include <map>
 #include <vector>
 #include <memory>
 #include <mutex>
@@ -44,7 +44,7 @@ private:
     VencChannel channel_;
     std::mutex slots_mutex_;
     std::vector<std::shared_ptr<ConsumerSlot>> slots_;
-    uint32_t next_consumer_id_ = 0;
+    std::atomic<uint32_t> next_consumer_id_{0};
 };
 
-#endif
+#endif // STREAM_DISTRIBUTOR_H

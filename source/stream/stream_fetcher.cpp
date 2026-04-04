@@ -47,9 +47,25 @@ void StreamFetcher::run() {
         int ret = select(fd + 1, &fds, nullptr, nullptr, &tv);
         if (ret <= 0) continue;
 
+        ot_venc_chn_status stat;
+        if (ss_mpi_venc_query_status(chn_val, &stat) != TD_SUCCESS) {
+            continue;
+        }
+
+        if (stat.cur_packs == 0) {
+            continue;
+        }
+
         ot_venc_stream stream;
+        stream.pack = (ot_venc_pack*)malloc(sizeof(ot_venc_pack) * stat.cur_packs);
+        if (stream.pack == nullptr) {
+            continue;
+        }
+        stream.pack_cnt = stat.cur_packs;
+
         td_s32 ok = ss_mpi_venc_get_stream(chn_val, &stream, 1000);
         if (ok != 0) {
+            free(stream.pack);
             continue;
         }
 
@@ -57,6 +73,8 @@ void StreamFetcher::run() {
         td_s32 release_ret = ss_mpi_venc_release_stream(chn_val, &stream);
         if (release_ret != TD_SUCCESS) {
         }
+        free(stream.pack);
+        stream.pack = nullptr;
         distributor_.push(frame);
     }
 }
