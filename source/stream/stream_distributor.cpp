@@ -113,7 +113,7 @@ void StreamDistributor::worker_func(std::shared_ptr<ConsumerSlot> slot) {
         }
 
         try {
-            slot->callback(frame);
+            slot->callback(*frame);
             slot->consumed++;
         } catch (const std::exception& e) {
         }

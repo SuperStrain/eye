@@ -11,23 +11,27 @@
 #include <thread>
 #include <atomic>
 
+struct WriteEntry {
+    std::vector<uint8_t> data;
+    bool is_idr;
+};
+
 class RecorderConsumer {
 public:
     RecorderConsumer(const std::string& filepath, size_t write_queue_size = 30);
     ~RecorderConsumer();
 
-    void on_frame(StreamFramePtr frame);
+    void on_frame(const StreamFrame& frame);
 
     uint64_t dropped() const { return dropped_; }
     uint64_t consumed() const { return consumed_; }
 
 private:
     void write_loop();
-    bool is_idr_frame(const StreamFramePtr& frame) const;
     void try_drop_frame();
 
     static constexpr size_t kMaxWriteQueue = 30;
-    std::deque<StreamFramePtr> write_queue_;
+    std::deque<WriteEntry> write_queue_;
     size_t max_queue_size_;
     std::mutex mutex_;
     std::condition_variable cv_;
