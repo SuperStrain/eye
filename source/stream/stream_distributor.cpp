@@ -82,6 +82,12 @@ void StreamDistributor::push(StreamFramePtr frame) {
 }
 
 void StreamDistributor::worker_func(std::shared_ptr<ConsumerSlot> slot) {
+    {
+        char name[16];
+        snprintf(name, sizeof(name), "stream_%u", slot->consumer_id);
+        pthread_setname_np(pthread_self(), name);
+    }
+
     if (slot->config.thread_priority > 0) {
         sched_param sched;
         sched.sched_priority = slot->config.thread_priority;
