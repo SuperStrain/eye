@@ -10,6 +10,7 @@
 
 enum LogCategory {
     HIMPP,
+    STREAM,
     LOG_MAX
 };
 
