@@ -42,7 +42,7 @@ private:
     void worker_func(std::shared_ptr<ConsumerSlot> slot);
 
     VencChannel channel_;
-    std::mutex slots_mutex_;
+    std::mutex slots_mutex_;    // ConsumerSlot
     std::vector<std::shared_ptr<ConsumerSlot>> slots_;
     std::atomic<uint32_t> next_consumer_id_{0};
 };
