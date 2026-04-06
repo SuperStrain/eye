@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <pthread.h>   
 #include <sched.h>     
+#include "logger.h"
 
 StreamDistributor::StreamDistributor(VencChannel chn) : channel_(chn) {}
 
@@ -110,7 +111,7 @@ void StreamDistributor::worker_func(std::shared_ptr<ConsumerSlot> slot) {
             slot->callback(*frame);
             slot->consumed++;
         } catch (const std::exception& e) {
-            
+            LOGGER_ERROR(STREAM, "Consumer %u: callback failed, exception=%s", slot->consumer_id, e.what());
         }
     }
 }

@@ -44,15 +44,13 @@ void StreamConsumerManager::unregister_consumer(StreamType type,
 }
 
 void StreamConsumerManager::start_all() {
-    for (std::map<StreamType, std::unique_ptr<StreamFetcher> >::iterator it = fetchers_.begin();
-         it != fetchers_.end(); ++it) {
-        it->second->start();
+    for (auto&fetcher  : fetchers_) {
+        fetcher.second->start();
     }
 }
 
 void StreamConsumerManager::stop_all() {
-    for (std::map<StreamType, std::unique_ptr<StreamFetcher> >::iterator it = fetchers_.begin();
-         it != fetchers_.end(); ++it) {
-        it->second->stop();
+    for (auto& fetcher : fetchers_) {
+        fetcher.second->stop();
     }
 }

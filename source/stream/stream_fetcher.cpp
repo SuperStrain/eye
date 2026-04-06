@@ -59,6 +59,7 @@ void StreamFetcher::run() {
         }
 
         if (stat.cur_packs == 0) {
+            LOGGER_INFO(STREAM, "Fetcher ch%d: no packs", chn_val);
             continue;
         }
 
