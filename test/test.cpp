@@ -1,4 +1,5 @@
 #include "test.h"
+#include "stream/stream_test.h"
 #include <ot_common.h>
 #include <ot_common_vpss.h>
 #include "global_constants.h"
@@ -182,5 +183,6 @@ static int yuv_frame_test()
 int test_main()
 {
     yuv_frame_test();
+    stream_test(10);
     return 0;
 }
