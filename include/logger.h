@@ -5,13 +5,22 @@
 #include <unordered_map>
 #include <thread>
 #include <atomic>
+#include <chrono>
 #include <zlog.h>
 
 
+#define LOG_CATEGORY_LIST \
+    X(HIMPP)              \
+    X(STREAM)
+
 enum LogCategory {
-    HIMPP,
+#define X(name) name,
+    LOG_CATEGORY_LIST
+#undef X
     LOG_MAX
 };
+
+extern const char* LogCategoryNames[];
 
 #define LOGGER_DEBUG(cat, fmt, ...)                                   \
     do {                                                              \
@@ -97,16 +106,20 @@ private:
 
     int check_config_task();
 
+    void preload_categories();
+
+    static bool ensure_dir(const char* path);
+
 private:
     bool initialized_;
     std::unordered_map<std::string, zlog_category_t*> cats_;
     std::thread check_config_thread_;
     std::atomic<bool> stop_flag_;
 
-private:
     static constexpr const char* CONFIG_FILE = "/app/conf/zlog.conf";
     static constexpr const char* UPDATE_FILE = "/app/conf/logupdate";
     static constexpr const char* LOG_DIR = "/data/eyeLog";
+    static constexpr std::chrono::seconds CHECK_INTERVAL{5};
 };
 
 }
