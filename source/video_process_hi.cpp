@@ -52,8 +52,8 @@ struct venc_chn_param {
     td_u32 frame_rate;
     td_u32 stats_time;
     td_u32 gop;
-    ot_pic_size size;   /* 分辨率枚举值 */
-    ot_size venc_size;  /* 实际分辨率 */
+    PicSize size;   /* 分辨率枚举值 */
+    Size venc_size;  /* 实际分辨率 */
     td_u32 profile;
     td_bool is_rcn_ref_share_buf;
     ot_venc_gop_attr gop_attr;
@@ -140,7 +140,7 @@ td_s32 videoProcessHi::videoImpl::comm_venc_h265_param_init(ot_venc_chn_attr *ch
     td_u32 gop = chn_param->gop;
     td_u32 stats_time = chn_param->stats_time;
     td_u32 frame_rate = chn_param->frame_rate;
-    ot_pic_size size = chn_param->size;
+    PicSize size = chn_param->size;
     video_venc_hi videoVencHi;
 
     chn_attr->venc_attr.h265_attr.frame_buf_ratio = frame_buf_ratio_default;
@@ -174,7 +174,7 @@ td_s32 videoProcessHi::videoImpl::comm_venc_h264_param_init(ot_venc_chn_attr *ch
     td_u32 gop = chn_param->gop;
     td_u32 stats_time = chn_param->stats_time;
     td_u32 frame_rate = chn_param->frame_rate;
-    ot_pic_size size = chn_param->size;
+    PicSize size = chn_param->size;
     video_venc_hi videoVencHi;
 
     chn_attr->venc_attr.h264_attr.frame_buf_ratio = frame_buf_ratio_default;
@@ -249,7 +249,7 @@ td_s32 videoProcessHi::videoImpl::comm_venc_channel_param_init(venc_chn_param *c
     ot_venc_gop_attr *gop_attr = &chn_param->gop_attr;
     td_u32 profile = chn_param->profile;
     ot_payload_type type = chn_param->type;
-    ot_size venc_size = chn_param->venc_size;
+    Size venc_size = chn_param->venc_size;
 
     chn_attr->venc_attr.type = type;
     chn_attr->venc_attr.max_pic_width = venc_size.width;
@@ -482,7 +482,7 @@ td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_para
     }
 
     /* encode chn0 */
-    ot_pic_size venc_chn0_size[3] ={
+    PicSize venc_chn0_size[3] ={
         PIC_2560X1440,
         PIC_2304X1296,
         PIC_1080P
@@ -498,7 +498,7 @@ td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_para
     venc_param[venc_chn0].is_rcn_ref_share_buf = TD_TRUE;
 
     /* encode chn1 */
-    ot_pic_size venc_chn1_size[3] ={
+    PicSize venc_chn1_size[3] ={
         PIC_720P,
         PIC_360P,
         PIC_CIF

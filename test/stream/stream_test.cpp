@@ -44,11 +44,10 @@ struct ChannelWriter {
 };
 
 static void frame_writer_cb(const StreamFrame& frame, ChannelWriter* writer) {
-    const auto& stream = frame.data();
-    for (uint32_t i = 0; i < stream.pack_cnt; ++i) {
-        const auto& pk = stream.pack[i];
-        td_u32 data_len = pk.len - pk.offset;
-        size_t written = fwrite(pk.addr + pk.offset, 1, data_len, writer->fp);
+    const auto& fd = frame.data();
+    for (uint32_t i = 0; i < fd.pack_count; ++i) {
+        const auto& pk = fd.packs[i];
+        size_t written = fwrite(pk.data, 1, pk.len, writer->fp);
         writer->bytes_written += written;
     }
     writer->frame_count++;

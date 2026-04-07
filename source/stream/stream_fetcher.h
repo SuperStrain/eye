@@ -5,6 +5,7 @@
 #include "stream_frame.h"
 #include "stream_distributor.h"
 #include "i_stream_provider.h"
+#include <ot_common_venc.h>
 #include <thread>
 #include <atomic>
 
@@ -14,8 +15,8 @@ public:
                   StreamDistributor& distributor);
     ~StreamFetcher();
 
-    void start() override;
-    void stop() override;
+    int start() override;
+    int stop() override;
     int fetchFrame(VencChannel chn, FrameData& frame) override;
     int releaseFrame(VencChannel chn) override;
     bool is_running() const { return running_; }

@@ -15,20 +15,22 @@ StreamFetcher::~StreamFetcher() {
     stop();
 }
 
-void StreamFetcher::start() {
-    if (running_) return;
+int StreamFetcher::start() {
+    if (running_) return 0;
     running_ = true;
     thread_ = std::thread(&StreamFetcher::run, this);
     LOGGER_NOTICE(STREAM, "Fetcher ch%d started", static_cast<int>(channel_));
+    return 0;
 }
 
-void StreamFetcher::stop() {
-    if (!running_) return;
+int StreamFetcher::stop() {
+    if (!running_) return 0;
     running_ = false;
     if (thread_.joinable()) {
         thread_.join();
     }
     LOGGER_NOTICE(STREAM, "Fetcher ch%d stopped", static_cast<int>(channel_));
+    return 0;
 }
 
 int StreamFetcher::fetchFrame(VencChannel chn, FrameData& frame) {

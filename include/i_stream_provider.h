@@ -7,8 +7,8 @@
 class IStreamProvider {
 public:
     virtual ~IStreamProvider() = default;
-    virtual int start(VencChannel chn) = 0;
-    virtual int stop(VencChannel chn) = 0;
+    virtual int start() = 0;
+    virtual int stop() = 0;
     virtual int fetchFrame(VencChannel chn, FrameData& frame) = 0;
     virtual int releaseFrame(VencChannel chn) = 0;
 };
