@@ -17,46 +17,23 @@ RecorderConsumer::~RecorderConsumer() {
 }
 
 static bool check_is_idr(const StreamFrame& frame) {
-    if (frame.codec_type() == CodecType::MJPEG) {
-        return true;
-    }
-
-    const auto& stream = frame.data();
-    for (uint32_t i = 0; i < stream.pack_cnt; ++i) {
-        const auto& dt = stream.pack[i].data_type;
-
-        if (frame.codec_type() == CodecType::H264) {
-            if (dt.h264_type == OT_VENC_H264_NALU_IDR_SLICE) {
-                return true;
-            }
-        } else if (frame.codec_type() == CodecType::H265) {
-            if (dt.h265_type == OT_VENC_H265_NALU_IDR_SLICE) {
-                return true;
-            }
-        }
-    }
-    return false;
+    return frame.is_idr();
 }
 
 void RecorderConsumer::on_frame(const StreamFrame& frame) {
-    const auto& stream = frame.data();
-
+    const auto& fd = frame.data();
     size_t total_len = 0;
-    for (uint32_t i = 0; i < stream.pack_cnt; ++i) {
-        total_len += stream.pack[i].len - stream.pack[i].offset;
+    for (uint32_t i = 0; i < fd.pack_count; ++i) {
+        total_len += fd.packs[i].len;
     }
-
     WriteEntry entry;
-    entry.is_idr = check_is_idr(frame);
+    entry.is_idr = frame.is_idr();
     entry.data.resize(total_len);
-
     size_t pos = 0;
-    for (uint32_t i = 0; i < stream.pack_cnt; ++i) {
-        const auto& pk = stream.pack[i];
-        td_u32 offset = pk.offset;
-        td_u32 data_len = pk.len - offset;
-        memcpy(entry.data.data() + pos, pk.addr + offset, data_len);
-        pos += data_len;
+    for (uint32_t i = 0; i < fd.pack_count; ++i) {
+        const auto& pk = fd.packs[i];
+        memcpy(entry.data.data() + pos, pk.data, pk.len);
+        pos += pk.len;
     }
 
     {
