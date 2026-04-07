@@ -1,0 +1,23 @@
+{
+    "clangd.arguments": [
+        "--background-index",
+        "--background-index-priority=low", 
+        "--completion-style=detailed",
+        "--header-insertion=iwyu",
+        "--header-insertion-decorators",
+        "--clang-tidy",
+        "--pch-storage=memory",
+        "--compile-commands-dir=build",
+        "--query-driver=/opt/*/bin/*,/opt/*/*/bin/*,/opt/*/*/*/bin/*,/opt/*/*/*/*/bin/*",
+        "--log=error",
+        "-j=8",                            
+        "--limit-results=30",              
+        "--limit-references=1000",                
+        "--malloc-trim",                     
+        "--function-arg-placeholders=false"  
+    ],
+    "clangd.fallbackFlags": [
+      "-std=gnu99",
+      "-std=gnu++11"
+    ]
+}
