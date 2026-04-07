@@ -18,6 +18,10 @@ void StreamConsumerManager::set_fetcher(StreamType type, std::unique_ptr<IStream
     fetchers_[type] = std::move(fetcher);
 }
 
+StreamDistributor& StreamConsumerManager::get_distributor(StreamType type) {
+    return *distributors_[type];
+}
+
 uint32_t StreamConsumerManager::register_consumer(StreamType type,
                                                   ConsumerCallback cb,
                                                   ConsumerConfig config) {

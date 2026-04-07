@@ -3,15 +3,15 @@
 
 #include "stream_distributor.h"
 #include "stream_common.h"
+#include "i_stream_provider.h"
 #include <map>
-
-class IStreamProvider;
 
 class StreamConsumerManager {
 public:
     static StreamConsumerManager& instance();
 
     void set_fetcher(StreamType type, std::unique_ptr<IStreamProvider> fetcher);
+    StreamDistributor& get_distributor(StreamType type);
 
     uint32_t register_consumer(StreamType type, ConsumerCallback cb,
                                 ConsumerConfig config = ConsumerConfig{});

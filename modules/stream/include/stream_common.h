@@ -4,17 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-
-enum class VencChannel { CHN0 = 0, CHN1 = 1, CHN2 = 2 };
-
-enum class StreamType {
-    VIDEO_MAIN,
-    VIDEO_SUB,
-    VIDEO_MJPEG,
-    AUDIO_AAC
-};
-
-enum class CodecType { H264, H265, MJPEG };
+#include "common_types.h"
 
 struct ConsumerConfig {
     size_t max_queue_size = 3;
@@ -22,7 +12,6 @@ struct ConsumerConfig {
 };
 
 class StreamFrame;
-class IStreamProvider;
 using StreamFramePtr = std::shared_ptr<StreamFrame>;
 using ConsumerCallback = std::function<void(const StreamFrame& frame)>;
 

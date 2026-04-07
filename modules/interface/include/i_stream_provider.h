@@ -2,7 +2,6 @@
 #define I_STREAM_PROVIDER_H
 
 #include "common_types.h"
-#include "stream_common.h"
 
 class IStreamProvider {
 public:
