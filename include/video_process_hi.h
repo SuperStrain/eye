@@ -6,9 +6,11 @@
 #include <thread>
 #include "global_constants.h"
 #include <memory>
+#include "i_video_pipeline.h"
+#include "i_video_encoder.h"
 
 namespace hiMppMedia {
-class videoProcessHi
+class videoProcessHi : public IVideoPipeline, public IVideoEncoder
 {
 public:
 
@@ -22,9 +24,17 @@ public:
         return instance;
     }
 
-    int init();
+    // IVideoPipeline overrides
+    int init() override;
+    int deinit() override;
+    int start() override;
+    int stop() override;
 
-    int deinit();
+    // IVideoEncoder overrides
+    int createChannel(int chn, CodecType codec, Size resolution) override;
+    int destroyChannel(int chn) override;
+    int startChannel(int chn) override;
+    int stopChannel(int chn) override;
 
 private:
 

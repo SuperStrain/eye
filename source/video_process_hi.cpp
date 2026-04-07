@@ -29,6 +29,8 @@
 #include <ot_common_venc.h>
 #include <ss_mpi_venc.h>
 #include "video_venc_hi.h"
+#include "stream_common.h"
+#include "common_types.h"
 namespace hiMppMedia {
 
 struct videoProcessHi::videoImpl {
@@ -660,6 +662,51 @@ int videoProcessHi::deinit()
     // venc module deinit
     return TD_SUCCESS;
 }
+
+int videoProcessHi::start()
+{
+    // Stub implementation - video pipeline start
+    // The actual VI/VPSS/ISP are started in init()
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::stop()
+{
+    // Stub implementation - video pipeline stop
+    // The actual VI/VPSS/ISP are stopped in deinit()
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::createChannel(int chn, CodecType codec, Size resolution)
+{
+    // Stub implementation - create encoding channel
+    (void)chn;
+    (void)codec;
+    (void)resolution;
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::destroyChannel(int chn)
+{
+    // Stub implementation - destroy encoding channel
+    (void)chn;
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::startChannel(int chn)
+{
+    // Stub implementation - start encoding channel
+    (void)chn;
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::stopChannel(int chn)
+{
+    // Stub implementation - stop encoding channel
+    (void)chn;
+    return TD_SUCCESS;
+}
+
 
 td_s32 videoProcessHi::hi_mpp_sys_init()
 {
