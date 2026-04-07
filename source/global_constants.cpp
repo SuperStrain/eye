@@ -1,8 +1,8 @@
 #include "global_constants.h"
 namespace hiMppMedia {
 
-/* The order of g_sample_pic_size's element must be consistent with the enum value defined in "ot_pic_size". */
-ot_size pic_size_array[PIC_BUTT] = {
+/* The order of pic_size_array's element must be consistent with the enum value defined in "PicSize". */
+Size pic_size_array[PIC_BUTT] = {
     { 352,  288  },  /* PIC_CIF */
     { 640,  360  },  /* PIC_360P */
     { 720,  576  },  /* PIC_D1_PAL */
