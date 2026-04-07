@@ -69,7 +69,7 @@ set (THIRDPARTY_LIB
     zlog
     )
  
-file(GLOB_RECURSE DIR_SRCS "./source/*.c" "./source/*.cpp")
+file(GLOB_RECURSE DIR_SRCS "./source/*.c" "./source/*.cpp" "./test/*.c" "./test/*.cpp")
 
 add_executable(${target_out} ${DIR_SRCS})
 
@@ -77,6 +77,7 @@ target_include_directories(
     ${target_out}
     PRIVATE
     ./include
+    ./source
     ${THIRDPARTY}/zlog/include
     ${THIRDPARTY}/hi3516cv610_mpp/include
 )
