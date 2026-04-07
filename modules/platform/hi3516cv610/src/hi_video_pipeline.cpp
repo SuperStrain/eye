@@ -1,4 +1,4 @@
-#include "video_process_hi.h"
+#include "hi_video_pipeline.h"
 #include <securec.h>
 #include <ot_common_sys.h>
 #include <ss_mpi_sys.h>
@@ -28,7 +28,7 @@
 #include <sensor/sc4336p/sc4336p_cmos.h>
 #include <ot_common_venc.h>
 #include <ss_mpi_venc.h>
-#include "video_venc_hi.h"
+#include "hi_venc_param.h"
 #include "stream_common.h"
 #include "common_types.h"
 namespace hiMppMedia {

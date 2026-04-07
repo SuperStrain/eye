@@ -1,5 +1,5 @@
 #include "stream_test.h"
-#include "stream/stream_consumer_manager.h"
+#include "stream_consumer_manager.h"
 #include "stream_common.h"
 #include "logger.h"
 #include <cerrno>

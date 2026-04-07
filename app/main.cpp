@@ -3,7 +3,7 @@
 #include <csignal>
 #include <unistd.h>
 #include "logger.h"
-#include "video_process_hi.h"
+#include "hi_video_pipeline.h"
 #include "test.h"
 
 void signal_handler(int sig) {

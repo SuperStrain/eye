@@ -1,4 +1,4 @@
-#include "video_venc_hi.h"
+#include "hi_venc_param.h"
 
 namespace hiMppMedia {  
 

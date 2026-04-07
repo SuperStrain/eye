@@ -1,5 +1,4 @@
-// source/stream/stream_fetcher.cpp
-#include "stream_fetcher.h"
+#include "hi_stream_fetcher.h"
 #include "logger.h"
 #include <ss_mpi_venc.h>
 #include <pthread.h>

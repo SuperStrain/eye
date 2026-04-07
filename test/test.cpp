@@ -1,7 +1,5 @@
 #include "test.h"
-#include "stream/stream_test.h"
-#include <ot_common.h>
-#include <ot_common_vpss.h>
+#include "stream_test.h"
 #include "global_constants.h"
 #include <ss_mpi_vpss.h>
 #include "logger.h"
@@ -9,7 +7,7 @@
 #include <thread>
 #include <unistd.h>
 #include <ss_mpi_sys_mem.h>
-#include "video_process_hi.h"
+#include "hi_video_pipeline.h"
 
 ot_vpss_grp g_vpssGrp = 0;
 ot_vpss_chn g_vpssChn = hiMppMedia::videoProcessHi::vpssChn2;
