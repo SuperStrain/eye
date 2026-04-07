@@ -27,10 +27,10 @@ struct ChannelWriter {
         fp = fopen(path.c_str(), "wb");
         if (!fp) {
             int err = errno;
-            LOGGER_ERROR(HIMPP, "fopen %s failed: %s", path.c_str(), strerror(err));
+            LOGGER_ERROR(TEST, "fopen %s failed: %s", path.c_str(), strerror(err));
             return false;
         }
-        LOGGER_INFO(HIMPP, "opened %s for writing", path.c_str());
+        LOGGER_INFO(TEST, "opened %s for writing", path.c_str());
         return true;
     }
 
@@ -63,8 +63,12 @@ static const char* stream_type_to_string(StreamType type) {
     }
 }
 
-void stream_test(int duration_sec) {
-    LOGGER_INFO(HIMPP, "=== stream_test start, duration=%ds ===", duration_sec);
+void stream_test(int duration_sec, int delay_sec) {
+    if (delay_sec > 0) {
+        LOGGER_INFO(TEST, "=== stream_test: waiting %ds for ISP warmup ===", delay_sec);
+        sleep(delay_sec);
+    }
+    LOGGER_INFO(TEST, "=== stream_test start, duration=%ds ===", duration_sec);
 
     std::unique_ptr<ChannelWriter> writers[] = {
         std::unique_ptr<ChannelWriter>(new ChannelWriter("/run/stream_chn0.h265",  "CHN0", StreamType::VIDEO_MAIN)),
@@ -77,7 +81,7 @@ void stream_test(int duration_sec) {
 
     for (int i = 0; i < 3; ++i) {
         if (!writers[i]->open()) {
-            LOGGER_ERROR(HIMPP, "stream_test: failed to open writer for %s", writers[i]->label.c_str());
+            LOGGER_ERROR(TEST, "stream_test: failed to open writer for %s", writers[i]->label.c_str());
             goto cleanup;
         }
     }
@@ -87,17 +91,17 @@ void stream_test(int duration_sec) {
         consumer_ids[i] = StreamConsumerManager::instance().register_consumer(
             writers[i]->stream_type, cb, ConsumerConfig{});
         reg_ok[i] = true;
-        LOGGER_INFO(HIMPP, "stream_test: registered consumer for %s, id=%u",
+        LOGGER_INFO(TEST, "stream_test: registered consumer for %s, id=%u",
                     writers[i]->label.c_str(), consumer_ids[i]);
     }
 
     StreamConsumerManager::instance().start_all();
-    LOGGER_INFO(HIMPP, "stream_test: all fetchers started, recording %ds...", duration_sec);
+    LOGGER_INFO(TEST, "stream_test: all fetchers started, recording %ds...", duration_sec);
 
     sleep(duration_sec);
 
     StreamConsumerManager::instance().stop_all();
-    LOGGER_INFO(HIMPP, "stream_test: all fetchers stopped");
+    LOGGER_INFO(TEST, "stream_test: all fetchers stopped");
 
 cleanup:
     for (int i = 0; i < 3; ++i) {
@@ -108,13 +112,13 @@ cleanup:
         writers[i]->close();
     }
 
-    LOGGER_INFO(HIMPP, "=== stream_test result ===");
+    LOGGER_INFO(TEST, "=== stream_test result ===");
     for (int i = 0; i < 3; ++i) {
-        LOGGER_INFO(HIMPP, "  %s [%s]: frames=%llu bytes=%llu",
+        LOGGER_INFO(TEST, "  %s [%s]: frames=%llu bytes=%llu",
                     writers[i]->label.c_str(),
                     stream_type_to_string(writers[i]->stream_type),
                     (unsigned long long)writers[i]->frame_count.load(),
                     (unsigned long long)writers[i]->bytes_written.load());
     }
-    LOGGER_INFO(HIMPP, "=== stream_test done ===");
+    LOGGER_INFO(TEST, "=== stream_test done ===");
 }
