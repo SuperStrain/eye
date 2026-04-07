@@ -63,7 +63,9 @@ set(THIRDPARTY_LIB
     zlog
     )
 
-option(TARGET_PLATFORM "hi3516cv610" "Target platform")
+if(NOT DEFINED TARGET_PLATFORM)
+    set(TARGET_PLATFORM "hi3516cv610")
+endif()
 
 add_subdirectory(modules/core)
 add_subdirectory(modules/interface)

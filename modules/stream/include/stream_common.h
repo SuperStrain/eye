@@ -22,6 +22,7 @@ struct ConsumerConfig {
 };
 
 class StreamFrame;
+class IStreamProvider;
 using StreamFramePtr = std::shared_ptr<StreamFrame>;
 using ConsumerCallback = std::function<void(const StreamFrame& frame)>;
 
