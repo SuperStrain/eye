@@ -1,6 +1,8 @@
 
 .vscode
 .cache
+.opencode
+.cursor
 build
 # Prerequisites
 *.d
