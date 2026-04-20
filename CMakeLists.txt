@@ -60,7 +60,6 @@ set(HI_MPP_LIB
 set(THIRDPARTY_LIB
     securec
     ${HI_MPP_LIB}
-    zlog
     )
 
 if(NOT DEFINED TARGET_PLATFORM)

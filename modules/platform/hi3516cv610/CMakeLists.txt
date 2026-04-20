@@ -5,17 +5,13 @@ add_library(platform_hi STATIC
 )
 target_include_directories(platform_hi PUBLIC
     include
-    ${CMAKE_SOURCE_DIR}/modules/interface/include
-    ${CMAKE_SOURCE_DIR}/modules/core/include
     ${CMAKE_SOURCE_DIR}/modules/stream/include
-    ${CMAKE_SOURCE_DIR}/thirdparty/zlog/include
     ${CMAKE_SOURCE_DIR}/thirdparty/hi3516cv610_mpp/include
 )
-target_link_directories(platform_hi PRIVATE
-    ${CMAKE_SOURCE_DIR}/thirdparty/zlog/lib
+target_link_directories(platform_hi PUBLIC
     ${CMAKE_SOURCE_DIR}/thirdparty/hi3516cv610_mpp/lib
 )
-target_link_libraries(platform_hi PUBLIC interface PRIVATE
-    pthread
-    ${THIRDPARTY_LIB}
+target_link_libraries(platform_hi
+    PUBLIC interface
+    PRIVATE pthread ${HI_MPP_LIB} securec
 )
