@@ -42,6 +42,11 @@ int StreamFetcher::fetchFrame(VencChannel chn, FrameData& frame) {
     if (stat.cur_packs == 0) {
         return -1;
     }
+    if (stat.cur_packs > FrameData::MAX_PACKS) {
+        LOGGER_ERROR(STREAM, "Fetcher ch%d: cur_packs(%u) exceeds MAX_PACKS(%u), truncated",
+                     chn_val, stat.cur_packs, FrameData::MAX_PACKS);
+        stat.cur_packs = FrameData::MAX_PACKS;
+    }
 
     current_stream_.pack = (ot_venc_pack*)malloc(sizeof(ot_venc_pack) * stat.cur_packs);
     if (current_stream_.pack == nullptr) {
