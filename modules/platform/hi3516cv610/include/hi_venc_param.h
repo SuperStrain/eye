@@ -31,7 +31,7 @@ public:
     td_u32 frame_rate);
 
     td_void comm_venc_h265_cvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time,
-    td_u32 frame_rate, ot_pic_size size);
+    td_u32 frame_rate, PicSize size);
 
     td_void comm_venc_h265_qvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time,
     td_u32 frame_rate);
@@ -55,7 +55,7 @@ public:
     td_u32 frame_rate);
 
     td_void comm_venc_h264_cvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time,
-    td_u32 frame_rate, ot_pic_size size);
+    td_u32 frame_rate, PicSize size);
 
     td_void comm_venc_h264_qvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time,
     td_u32 frame_rate);
@@ -78,10 +78,10 @@ public:
     /* SVAC3 */
 private:
     td_void comm_venc_set_h265_cvbr_bit_rate(ot_venc_chn_attr *venc_chn_attr, ot_venc_h265_cvbr *h265_cvbr,
-    td_u32 frame_rate, ot_pic_size size);
+    td_u32 frame_rate, PicSize size);
 
     td_void comm_venc_set_h264_cvbr_bit_rate(ot_venc_chn_attr *venc_chn_attr, ot_venc_h264_cvbr *h264_cvbr,
-        td_u32 frame_rate, ot_pic_size size);
+        td_u32 frame_rate, PicSize size);
 };
 
 }

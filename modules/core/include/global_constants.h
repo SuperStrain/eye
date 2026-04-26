@@ -1,6 +1,7 @@
 #ifndef GLOBAL_CONSTANTS_H
 #define GLOBAL_CONSTANTS_H
-#include <ot_common_video.h>
+#include "common_types.h"
+
 namespace hiMppMedia {
 
 typedef enum {
@@ -39,10 +40,10 @@ typedef enum {
     PIC_3840X8640,
     PIC_2880X1620,
     PIC_BUTT
-} ot_pic_size;
+} PicSize;
 
-/* The order of g_sample_pic_size's element must be consistent with the enum value defined in "ot_pic_size". */
-extern ot_size pic_size_array[PIC_BUTT];
+/* The order of pic_size_array's element must be consistent with the enum value defined in "PicSize". */
+extern Size pic_size_array[PIC_BUTT];
 
 }
 

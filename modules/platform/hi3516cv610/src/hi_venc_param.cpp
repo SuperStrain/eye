@@ -1,4 +1,4 @@
-#include "video_venc_hi.h"
+#include "hi_venc_param.h"
 
 namespace hiMppMedia {  
 
@@ -96,7 +96,7 @@ td_void video_venc_hi::comm_venc_h265_avbr_param_init(ot_venc_chn_attr *venc_chn
     venc_chn_attr->rc_attr.h265_avbr = h265_avbr;    
 }
 
-td_void video_venc_hi::comm_venc_set_h265_cvbr_bit_rate(ot_venc_chn_attr *venc_chn_attr, ot_venc_h265_cvbr *h265_cvbr, td_u32 frame_rate, ot_pic_size size)
+td_void video_venc_hi::comm_venc_set_h265_cvbr_bit_rate(ot_venc_chn_attr *venc_chn_attr, ot_venc_h265_cvbr *h265_cvbr, td_u32 frame_rate, PicSize size)
 {
     td_u32  pic_width;
     td_u32  pic_height;
@@ -163,7 +163,7 @@ td_void video_venc_hi::comm_venc_set_h265_cvbr_bit_rate(ot_venc_chn_attr *venc_c
     }
 }
 
-td_void video_venc_hi::comm_venc_h265_cvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time, td_u32 frame_rate, ot_pic_size size)
+td_void video_venc_hi::comm_venc_h265_cvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time, td_u32 frame_rate, PicSize size)
 {
     ot_venc_h265_cvbr h265_cvbr;
 
@@ -295,7 +295,7 @@ td_void video_venc_hi::comm_venc_h264_avbr_param_init(ot_venc_chn_attr *venc_chn
 }
 
 td_void video_venc_hi::comm_venc_set_h264_cvbr_bit_rate(ot_venc_chn_attr *venc_chn_attr, ot_venc_h264_cvbr *h264_cvbr,
-    td_u32 frame_rate, ot_pic_size size)
+    td_u32 frame_rate, PicSize size)
 {
     td_u32  pic_width;
     td_u32  pic_height;
@@ -354,7 +354,7 @@ td_void video_venc_hi::comm_venc_set_h264_cvbr_bit_rate(ot_venc_chn_attr *venc_c
     }    
 }
 
-td_void video_venc_hi::comm_venc_h264_cvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time, td_u32 frame_rate, ot_pic_size size)
+td_void video_venc_hi::comm_venc_h264_cvbr_param_init(ot_venc_chn_attr *venc_chn_attr, td_u32 gop, td_u32 stats_time, td_u32 frame_rate, PicSize size)
 {
     ot_venc_h264_cvbr h264_cvbr;
 

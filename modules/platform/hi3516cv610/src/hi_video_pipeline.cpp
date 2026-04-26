@@ -1,4 +1,4 @@
-#include "video_process_hi.h"
+#include "hi_video_pipeline.h"
 #include <securec.h>
 #include <ot_common_sys.h>
 #include <ss_mpi_sys.h>
@@ -28,7 +28,9 @@
 #include <sensor/sc4336p/sc4336p_cmos.h>
 #include <ot_common_venc.h>
 #include <ss_mpi_venc.h>
-#include "video_venc_hi.h"
+#include "hi_venc_param.h"
+#include "stream_common.h"
+#include "common_types.h"
 namespace hiMppMedia {
 
 struct videoProcessHi::videoImpl {
@@ -50,8 +52,8 @@ struct venc_chn_param {
     td_u32 frame_rate;
     td_u32 stats_time;
     td_u32 gop;
-    ot_pic_size size;   /* 分辨率枚举值 */
-    ot_size venc_size;  /* 实际分辨率 */
+    PicSize size;   /* 分辨率枚举值 */
+    Size venc_size;  /* 实际分辨率 */
     td_u32 profile;
     td_bool is_rcn_ref_share_buf;
     ot_venc_gop_attr gop_attr;
@@ -138,7 +140,7 @@ td_s32 videoProcessHi::videoImpl::comm_venc_h265_param_init(ot_venc_chn_attr *ch
     td_u32 gop = chn_param->gop;
     td_u32 stats_time = chn_param->stats_time;
     td_u32 frame_rate = chn_param->frame_rate;
-    ot_pic_size size = chn_param->size;
+    PicSize size = chn_param->size;
     video_venc_hi videoVencHi;
 
     chn_attr->venc_attr.h265_attr.frame_buf_ratio = frame_buf_ratio_default;
@@ -172,7 +174,7 @@ td_s32 videoProcessHi::videoImpl::comm_venc_h264_param_init(ot_venc_chn_attr *ch
     td_u32 gop = chn_param->gop;
     td_u32 stats_time = chn_param->stats_time;
     td_u32 frame_rate = chn_param->frame_rate;
-    ot_pic_size size = chn_param->size;
+    PicSize size = chn_param->size;
     video_venc_hi videoVencHi;
 
     chn_attr->venc_attr.h264_attr.frame_buf_ratio = frame_buf_ratio_default;
@@ -247,7 +249,7 @@ td_s32 videoProcessHi::videoImpl::comm_venc_channel_param_init(venc_chn_param *c
     ot_venc_gop_attr *gop_attr = &chn_param->gop_attr;
     td_u32 profile = chn_param->profile;
     ot_payload_type type = chn_param->type;
-    ot_size venc_size = chn_param->venc_size;
+    Size venc_size = chn_param->venc_size;
 
     chn_attr->venc_attr.type = type;
     chn_attr->venc_attr.max_pic_width = venc_size.width;
@@ -480,7 +482,7 @@ td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_para
     }
 
     /* encode chn0 */
-    ot_pic_size venc_chn0_size[3] ={
+    PicSize venc_chn0_size[3] ={
         PIC_2560X1440,
         PIC_2304X1296,
         PIC_1080P
@@ -496,7 +498,7 @@ td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_para
     venc_param[venc_chn0].is_rcn_ref_share_buf = TD_TRUE;
 
     /* encode chn1 */
-    ot_pic_size venc_chn1_size[3] ={
+    PicSize venc_chn1_size[3] ={
         PIC_720P,
         PIC_360P,
         PIC_CIF
@@ -512,7 +514,7 @@ td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_para
     venc_param[venc_chn1].is_rcn_ref_share_buf = TD_TRUE;
 
     /* encode chn2 MJPEG */
-    venc_param[venc_chn2].frame_rate = 20; // 减小cpu压力
+    venc_param[venc_chn2].frame_rate = subFrameRate; // 减小cpu压力
     venc_param[venc_chn2].gop = 60;
     venc_param[venc_chn2].stats_time = 2;
     venc_param[venc_chn2].gop_attr = gop_attr;
@@ -661,6 +663,51 @@ int videoProcessHi::deinit()
     return TD_SUCCESS;
 }
 
+int videoProcessHi::start()
+{
+    // Stub implementation - video pipeline start
+    // The actual VI/VPSS/ISP are started in init()
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::stop()
+{
+    // Stub implementation - video pipeline stop
+    // The actual VI/VPSS/ISP are stopped in deinit()
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::createChannel(int chn, CodecType codec, Size resolution)
+{
+    // Stub implementation - create encoding channel
+    (void)chn;
+    (void)codec;
+    (void)resolution;
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::destroyChannel(int chn)
+{
+    // Stub implementation - destroy encoding channel
+    (void)chn;
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::startChannel(int chn)
+{
+    // Stub implementation - start encoding channel
+    (void)chn;
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::stopChannel(int chn)
+{
+    // Stub implementation - stop encoding channel
+    (void)chn;
+    return TD_SUCCESS;
+}
+
+
 td_s32 videoProcessHi::hi_mpp_sys_init()
 {
     ot_vpss_chn_attr chn_attr[3] = {};
@@ -797,8 +844,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
 	stVpssGrpAttr.max_height = resList[0][1];
 	stVpssGrpAttr.pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
 	stVpssGrpAttr.dynamic_range = OT_DYNAMIC_RANGE_SDR8;
-	stVpssGrpAttr.frame_rate.src_frame_rate = -1;
-    stVpssGrpAttr.frame_rate.dst_frame_rate = -1;
+	stVpssGrpAttr.frame_rate.src_frame_rate = maxFrameRate;
+    stVpssGrpAttr.frame_rate.dst_frame_rate = maxFrameRate;
 	s32Ret = ss_mpi_vpss_create_grp(VpssGrp, &stVpssGrpAttr);
     if (s32Ret != TD_SUCCESS)
     {
@@ -817,8 +864,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].pixel_format  = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_SEG_COMPACT;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
-    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;	
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = maxFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 0;
@@ -843,8 +890,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
-    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = subFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 0;
@@ -867,8 +914,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
-    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = subFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 2;
@@ -1649,7 +1696,7 @@ td_s32 videoProcessHi::venc_start_encode(ot_vpss_grp VpssGrp)
         return TD_FAILURE;
     }
 
-    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn1, videoImpl::venc_chn2);
+    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn2, videoImpl::venc_chn2);
     if(s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP, "bind_vpss_venc failed!");

@@ -5,6 +5,7 @@
 #include "stream_common.h"
 #include <fstream>
 #include <string>
+#include <vector>
 #include <deque>
 #include <mutex>
 #include <condition_variable>

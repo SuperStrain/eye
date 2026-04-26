@@ -12,24 +12,14 @@ StreamConsumerManager::StreamConsumerManager() {
         std::unique_ptr<StreamDistributor>(new StreamDistributor(VencChannel::CHN1));
     distributors_[StreamType::VIDEO_MJPEG] =
         std::unique_ptr<StreamDistributor>(new StreamDistributor(VencChannel::CHN2));
+}
 
-    CodecType main_codec = CodecType::H265;
-    CodecType sub_codec = CodecType::H264;
+void StreamConsumerManager::set_fetcher(StreamType type, std::unique_ptr<IStreamProvider> fetcher) {
+    fetchers_[type] = std::move(fetcher);
+}
 
-    fetchers_[StreamType::VIDEO_MAIN] =
-        std::unique_ptr<StreamFetcher>(new StreamFetcher(
-            VencChannel::CHN0, StreamType::VIDEO_MAIN, main_codec,
-            *distributors_[StreamType::VIDEO_MAIN]));
-
-    fetchers_[StreamType::VIDEO_SUB] =
-        std::unique_ptr<StreamFetcher>(new StreamFetcher(
-            VencChannel::CHN1, StreamType::VIDEO_SUB, sub_codec,
-            *distributors_[StreamType::VIDEO_SUB]));
-
-    fetchers_[StreamType::VIDEO_MJPEG] =
-        std::unique_ptr<StreamFetcher>(new StreamFetcher(
-            VencChannel::CHN2, StreamType::VIDEO_MJPEG, CodecType::MJPEG,
-            *distributors_[StreamType::VIDEO_MJPEG]));
+StreamDistributor& StreamConsumerManager::get_distributor(StreamType type) {
+    return *distributors_[type];
 }
 
 uint32_t StreamConsumerManager::register_consumer(StreamType type,
@@ -44,7 +34,7 @@ void StreamConsumerManager::unregister_consumer(StreamType type,
 }
 
 void StreamConsumerManager::start_all() {
-    for (auto&fetcher  : fetchers_) {
+    for (auto& fetcher : fetchers_) {
         fetcher.second->start();
     }
 }
