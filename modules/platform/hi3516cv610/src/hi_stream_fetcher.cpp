@@ -124,6 +124,7 @@ void StreamFetcher::run() {
     fd_ = ss_mpi_venc_get_fd(chn_val);
     if (fd_ < 0) {
         LOGGER_ERROR(STREAM, "Fetcher ch%d: ss_mpi_venc_get_fd failed, fd=%d", chn_val, fd_);
+        running_ = false;
         return;
     }
     LOGGER_INFO(STREAM, "Fetcher ch%d running, fd=%d", chn_val, fd_);
