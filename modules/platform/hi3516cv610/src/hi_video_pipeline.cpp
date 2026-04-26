@@ -1696,7 +1696,7 @@ td_s32 videoProcessHi::venc_start_encode(ot_vpss_grp VpssGrp)
         return TD_FAILURE;
     }
 
-    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn1, videoImpl::venc_chn2);
+    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn2, videoImpl::venc_chn2);
     if(s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP, "bind_vpss_venc failed!");
