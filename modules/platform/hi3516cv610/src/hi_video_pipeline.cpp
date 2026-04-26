@@ -514,7 +514,7 @@ td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_para
     venc_param[venc_chn1].is_rcn_ref_share_buf = TD_TRUE;
 
     /* encode chn2 MJPEG */
-    venc_param[venc_chn2].frame_rate = 20; // 减小cpu压力
+    venc_param[venc_chn2].frame_rate = subFrameRate; // 减小cpu压力
     venc_param[venc_chn2].gop = 60;
     venc_param[venc_chn2].stats_time = 2;
     venc_param[venc_chn2].gop_attr = gop_attr;
@@ -844,8 +844,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
 	stVpssGrpAttr.max_height = resList[0][1];
 	stVpssGrpAttr.pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
 	stVpssGrpAttr.dynamic_range = OT_DYNAMIC_RANGE_SDR8;
-	stVpssGrpAttr.frame_rate.src_frame_rate = -1;
-    stVpssGrpAttr.frame_rate.dst_frame_rate = -1;
+	stVpssGrpAttr.frame_rate.src_frame_rate = maxFrameRate;
+    stVpssGrpAttr.frame_rate.dst_frame_rate = maxFrameRate;
 	s32Ret = ss_mpi_vpss_create_grp(VpssGrp, &stVpssGrpAttr);
     if (s32Ret != TD_SUCCESS)
     {
@@ -864,8 +864,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].pixel_format  = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_SEG_COMPACT;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
-    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;	
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = maxFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 0;
@@ -890,8 +890,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
-    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = subFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 0;
@@ -914,8 +914,8 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].pixel_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
-    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = -1;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = -1;    
+    stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = subFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 2;
