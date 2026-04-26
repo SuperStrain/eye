@@ -27,6 +27,10 @@ uint32_t StreamDistributor::add_consumer(ConsumerCallback cb, ConsumerConfig con
     slot->consumer_id = next_consumer_id_.fetch_add(1, std::memory_order_relaxed);
     slot->callback = std::move(cb);
     slot->max_queue_size = config.max_queue_size;
+    if (slot->max_queue_size == 0) {
+        LOGGER_WARN(STREAM, "Consumer %u: max_queue_size=0 is invalid, forcing to 1", slot->consumer_id);
+        slot->max_queue_size = 1;
+    }
     slot->config = config;
     {
         std::lock_guard<std::mutex> lock(slots_mutex_);
