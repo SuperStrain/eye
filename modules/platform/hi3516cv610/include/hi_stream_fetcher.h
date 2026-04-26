@@ -2,7 +2,6 @@
 #ifndef _STREAM_FETCHER_H_
 #define _STREAM_FETCHER_H_
 
-#include "stream_frame.h"
 #include "stream_distributor.h"
 #include "i_stream_provider.h"
 #include <ot_common_venc.h>

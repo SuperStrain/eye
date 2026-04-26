@@ -29,7 +29,6 @@
 #include <ot_common_venc.h>
 #include <ss_mpi_venc.h>
 #include "hi_venc_param.h"
-#include "stream_common.h"
 #include "common_types.h"
 namespace hiMppMedia {
 

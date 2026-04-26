@@ -1,5 +1,4 @@
 #include "stream_frame.h"
-#include <algorithm>
 
 StreamFrame::StreamFrame(VencChannel chn, StreamType type, CodecType codec, const FrameData& data)
     : channel_(chn), type_(type), codec_type_(codec), frame_data_(data) {

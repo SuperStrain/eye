@@ -4,7 +4,6 @@
 #include <ot_common_vpss.h>
 #include <ot_type.h>
 #include <thread>
-#include "global_constants.h"
 #include <memory>
 #include "i_video_pipeline.h"
 #include "i_video_encoder.h"

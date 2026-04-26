@@ -1,10 +1,8 @@
 #ifndef _STREAM_COMMON_H_
 #define _STREAM_COMMON_H_
 
-#include <cstdint>
 #include <functional>
 #include <memory>
-#include "common_types.h"
 
 struct ConsumerConfig {
     size_t max_queue_size = 3;

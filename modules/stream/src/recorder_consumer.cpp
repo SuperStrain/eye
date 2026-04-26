@@ -1,5 +1,4 @@
 #include "recorder_consumer.h"
-#include <algorithm>
 #include <cstring>
 
 RecorderConsumer::RecorderConsumer(const std::string& filepath, size_t write_queue_size)
