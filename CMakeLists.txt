@@ -72,18 +72,6 @@ add_subdirectory(modules/stream)
 add_subdirectory(modules/platform/${TARGET_PLATFORM})
 add_subdirectory(app)
 
-file(GLOB_RECURSE DIR_SRCS "./test/*.c" "./test/*.cpp")
-add_executable(${target_out}_test EXCLUDE_FROM_ALL ${DIR_SRCS})
-target_include_directories(${target_out}_test PRIVATE
-    ./test
-    ${THIRDPARTY}/zlog/include
-    ${THIRDPARTY}/hi3516cv610_mpp/include)
-target_link_directories(${target_out}_test PRIVATE
-    ${THIRDPARTY}/zlog/lib
-    ${THIRDPARTY}/hi3516cv610_mpp/lib)
-target_link_libraries(${target_out}_test PRIVATE
-    pthread ${THIRDPARTY_LIB})
-
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   if(DEFINED ENV{HOME})
     set(default_install_dir "$ENV{HOME}/eyeOut")
