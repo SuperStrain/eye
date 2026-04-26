@@ -4,6 +4,7 @@
 #include "stream_common.h"
 #include "common_types.h"
 #include <memory>
+#include <vector>
 
 class StreamFrame {
 public:
@@ -24,6 +25,7 @@ private:
     CodecType codec_type_;
     uint64_t timestamp_;
     FrameData frame_data_;
+    std::vector<std::vector<uint8_t>> pack_data_;
 };
 
 using StreamFramePtr = std::shared_ptr<StreamFrame>;
