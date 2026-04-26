@@ -33,7 +33,7 @@ struct FramePack {
 };
 
 struct FrameData {
-    static constexpr uint32_t MAX_PACKS = 8;
+    static constexpr uint32_t MAX_PACKS = 16;
     FramePack packs[MAX_PACKS];
     uint32_t pack_count;
     uint32_t seq;
