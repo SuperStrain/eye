@@ -1,4 +1,5 @@
 #include "stream_consumer_manager.h"
+#include "logger.h"
 
 StreamConsumerManager& StreamConsumerManager::instance() {
     static StreamConsumerManager instance;
@@ -19,18 +20,34 @@ void StreamConsumerManager::set_fetcher(StreamType type, std::unique_ptr<IStream
 }
 
 StreamDistributor& StreamConsumerManager::get_distributor(StreamType type) {
-    return *distributors_[type];
+    auto it = distributors_.find(type);
+    if (it == distributors_.end() || !it->second) {
+        LOGGER_FATAL(STREAM, "No distributor for stream type %d", static_cast<int>(type));
+        static StreamDistributor dummy(VencChannel::CHN0);
+        return dummy;
+    }
+    return *it->second;
 }
 
 uint32_t StreamConsumerManager::register_consumer(StreamType type,
                                                   ConsumerCallback cb,
                                                   ConsumerConfig config) {
-    return distributors_[type]->add_consumer(cb, config);
+    auto it = distributors_.find(type);
+    if (it == distributors_.end() || !it->second) {
+        LOGGER_ERROR(STREAM, "Cannot register consumer for unknown stream type %d", static_cast<int>(type));
+        return static_cast<uint32_t>(-1);
+    }
+    return it->second->add_consumer(cb, config);
 }
 
 void StreamConsumerManager::unregister_consumer(StreamType type,
                                                 uint32_t consumer_id) {
-    distributors_[type]->remove_consumer(consumer_id);
+    auto it = distributors_.find(type);
+    if (it == distributors_.end() || !it->second) {
+        LOGGER_ERROR(STREAM, "Cannot unregister consumer for unknown stream type %d", static_cast<int>(type));
+        return;
+    }
+    it->second->remove_consumer(consumer_id);
 }
 
 void StreamConsumerManager::start_all() {
