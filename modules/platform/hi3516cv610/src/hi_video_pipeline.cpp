@@ -513,7 +513,7 @@ td_s32 videoProcessHi::videoImpl::venc_set_video_param(venc_chn_param* venc_para
     venc_param[venc_chn1].is_rcn_ref_share_buf = TD_TRUE;
 
     /* encode chn2 MJPEG */
-    venc_param[venc_chn2].frame_rate = subFrameRate; // 减小cpu压力
+    venc_param[venc_chn2].frame_rate = subVencFrameRate; // 减小cpu压力
     venc_param[venc_chn2].gop = 60;
     venc_param[venc_chn2].stats_time = 2;
     venc_param[venc_chn2].gop_attr = gop_attr;
@@ -747,7 +747,7 @@ td_s32 videoProcessHi::hi_mpp_sys_init()
     buf_attr.height = VI_HEIGHT1;
     u64BlkSize = ot_common_get_pic_buf_size(&buf_attr);
     stVbConf.common_pool[1].blk_size = u64BlkSize;
-    stVbConf.common_pool[1].blk_cnt = 2;
+    stVbConf.common_pool[1].blk_cnt = 3;
    
     // 算法使用
     buf_attr.width = VI_WIDTH2;
@@ -890,7 +890,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
     stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = subFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = maxFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 0;
@@ -914,7 +914,7 @@ td_s32 videoProcessHi::init_vpss_module(ot_vpss_grp VpssGrp, td_bool *abChnEnabl
     stVpssChnAttr[VpssChn].dynamic_range = OT_DYNAMIC_RANGE_SDR8;
     stVpssChnAttr[VpssChn].compress_mode = OT_COMPRESS_MODE_NONE;
     stVpssChnAttr[VpssChn].frame_rate.src_frame_rate = maxFrameRate;
-    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = subFrameRate;
+    stVpssChnAttr[VpssChn].frame_rate.dst_frame_rate = subVpssFrameRate;
     stVpssChnAttr[VpssChn].mirror_en = TD_FALSE;
     stVpssChnAttr[VpssChn].flip_en = TD_FALSE;
     stVpssChnAttr[VpssChn].depth = 2;
@@ -1695,7 +1695,7 @@ td_s32 videoProcessHi::venc_start_encode(ot_vpss_grp VpssGrp)
         return TD_FAILURE;
     }
 
-    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn2, videoImpl::venc_chn2);
+    s32Ret = impl_->bind_vpss_venc(VpssGrp, vpssChn1, videoImpl::venc_chn2);
     if(s32Ret != TD_SUCCESS)
     {
         LOGGER_ERROR(HIMPP, "bind_vpss_venc failed!");

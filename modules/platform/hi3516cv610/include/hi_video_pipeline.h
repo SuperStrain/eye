@@ -94,7 +94,8 @@ public:
     static constexpr int vpssChn2 = 2;
 
     static constexpr int maxFrameRate = 30;
-    static constexpr int subFrameRate = 20;
+    static constexpr int subVpssFrameRate = 5;
+    static constexpr int subVencFrameRate = 10;
     static constexpr int SENSOR_MAX_WIDTH = 2560;
     static constexpr int SENSOR_MAX_HEIGHT = 1440;
 
