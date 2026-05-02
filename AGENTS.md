@@ -1,72 +1,38 @@
-# eye - 嵌入式视频处理应用
+# eye 仓库指令
 
-## 项目概述
+## 环境与构建
 
-基于海思 Hi3516CV610 平台的视频采集与编码应用，ARM 交叉编译，运行在目标设备上。
+- 这是海思 Hi3516CV610 嵌入式视频采集/编码程序；不要尝试本地运行生成物，二进制运行在 ARM 目标设备上。
+- 交叉工具链前缀是 `arm-v01c02-linux-musleabi-`，CPU flags 在 `cmake/toolchain-arm-v01c02.cmake`：`-mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4`。
+- CMake 必须显式带 toolchain；根 `CMakeLists.txt` 未设置 `CMAKE_TOOLCHAIN_FILE` 会直接 `FATAL_ERROR`。
+- 标准构建顺序：`cd build && ./set.sh && make && cmake --install .`。
+- `build/set.sh` 会先执行 `build/clean.sh`，清掉 `build/` 内除 `.sh` 外的文件，再用 Release 配置 CMake。
+- 默认安装目录是 `$HOME/eyeOut`；安装前根 `CMakeLists.txt` 会 `file(REMOVE_RECURSE "${CMAKE_INSTALL_PREFIX}")`，不要把安装前缀指向需要保留的目录。
+- `ENABLE_PEDANTIC=ON` 只额外加 `-Wpedantic`；没有独立 lint/format/test runner 配置。
 
-- 传感器：SC4336P，最大分辨率 2560x1440@30fps
-- 平台：Cortex-A7 + NEON，arm-v01c02-linux-musleabi 工具链
-- 标准：C11 / C++11
+## 结构与入口
 
-## 构建
+- 可执行目标是 `eye`，入口在 `app/main.cpp`；启动顺序是日志初始化、`videoProcessHi::init()` 初始化 MPP 管线、注册三路 `StreamFetcher`、调用 `test_main()`、再 `pause()` 常驻。
+- 根 CMake 固定添加 `modules/core`、`modules/interface`、`modules/stream`、`modules/platform/${TARGET_PLATFORM}`、`app`；默认 `TARGET_PLATFORM=hi3516cv610`。
+- `modules/interface` 只是接口库并链接 `core`；`modules/stream` 是平台无关分发层；`modules/platform/hi3516cv610` 是 HiSilicon MPP 实现并链接 MPP/zlog/securec/pthread。
+- `app/CMakeLists.txt` 当前把 `test/test.cpp` 和 `test/stream/stream_test.cpp` 编进正式 `eye` 目标；`test_main()` 不是单独测试二进制入口。
 
-```bash
-cd build
-./set.sh   # 清理 + cmake 配置（含 toolchain）
-make       # 编译
-cmake --install .   # 安装到 ~/eyeOut（默认）
-```
+## 视频与码流事实
 
-- `set.sh` 调用 `clean.sh` 清理 build 目录后执行 cmake
-- toolchain 文件：`cmake/toolchain-arm-v01c02.cmake`
-- **不能本地编译或运行**，所有编译必须通过交叉编译工具链
-- CMake 要求显式指定 `-DCMAKE_TOOLCHAIN_FILE`，否则报错
-- `ENABLE_PEDANTIC` 选项可开启更严格的警告
+- Sensor/VI 最大尺寸在代码中是 SC4336P `2560x1440@30fps`，MIPI 节点为 `/dev/ot_mipi_rx`。
+- VPSS 三个物理通道在 `hi_video_pipeline.h`/`hi_video_pipeline.cpp`：Chn0 `2560x1440@30`，Chn1 `1280x720@30`，Chn2 `640x384` 且 dst frame rate 为 `5`。
+- VENC 三路在 `venc_set_video_param()`：Chn0 H.265 CBR `PIC_2560X1440@30`，Chn1 H.264 CBR `PIC_720P@30`，Chn2 MJPEG CBR `PIC_360P@10`。不要把 VPSS Chn2 的 `640x384` 误写成 MJPEG 输出分辨率。
+- `StreamConsumerManager` 在全局命名空间，不在 `hiMppMedia`；构造时固定为 `VIDEO_MAIN/SUB/MJPEG` 建三个 `StreamDistributor`。
+- `VencChannel`、`StreamType`、`CodecType` 定义在 `modules/core/include/common_types.h` 的全局作用域。
 
-## 架构
+## 运行时路径与日志
 
-模块化分层设计，根 `CMakeLists.txt` 通过 `add_subdirectory` 管理：
+- zlog 配置硬编码为 `/app/conf/zlog.conf`，更新触发文件是 `/app/conf/logupdate`，日志目录是 `/data/eyeLog`。
+- `conf/` 安装到安装前缀的 `conf/`；部署到设备时要保证 `/app/conf/zlog.conf` 存在。
+- 日志分类只定义了 `HIMPP`、`TEST`、`STREAM`；宏用法是 `LOGGER_INFO(HIMPP, "format %d", value)`。
+- `stream_test()` 写设备侧文件：`/run/stream_chn0.h265`、`/run/stream_chn1.h264`、`/run/stream_chn2.mjpeg`。
 
-```
-app/                 → 可执行文件入口 (eye)
-modules/
-  interface/         → 抽象接口：IVideoPipeline、IVideoEncoder、IStreamProvider
-  core/              → 日志 (logger)、公共类型 (common_types)、全局常量
-  stream/            → 平台无关的码流处理：Frame、Distributor、ConsumerManager
-  platform/hi3516cv610/  → 海思平台实现：pipeline、venc 参数、stream fetcher
-```
+## 第三方与安装
 
-| 模块 | 关键文件 | 职责 |
-|------|----------|------|
-| 入口 | `app/main.cpp` | 初始化日志、pipeline、三路码流 Fetcher，调用 `test_main()` |
-| 平台实现 | `hi_video_pipeline.cpp` | VI/VPSS/ISP/VENC 初始化与绑定 |
-| 编码参数 | `hi_venc_param.cpp` | H.265/H.264/MJPEG 通道参数配置 |
-| 码流获取 | `hi_stream_fetcher.cpp` | 从 VENC 获取编码帧 |
-| 码流分发 | `stream_distributor.cpp` | 将帧分发给已注册的 Consumer |
-| 消费者管理 | `stream_consumer_manager.cpp` | 全局单例，管理 Fetcher 与 Distributor 生命周期 |
-| 日志 | `modules/core/src/logger.cpp` | zlog 封装，运行时配置 `/app/conf/zlog.conf` |
-
-数据流：
-```
-Sensor → MIPI_RX → VI(PIPE) → ISP → VI(CHN) → VPSS → VENC → StreamFetcher → StreamDistributor → Consumers
-                                    (RAW)   (RGB→YUV)                    ├→ VO
-                                                                          ├→ VENC（Chn0: 2560x1440 H.265 / Chn1: 1280x720 H.264 / Chn2: 640x384 MJPEG）
-                                                                          └→ USER
-```
-
-## 依赖
-
-- **HiSilicon MPP**：`thirdparty/hi3516cv610_mpp/`（头文件 + ARM .so）
-- **zlog**：`thirdparty/zlog/`（头文件 + ARM .so）
-- MPP 库列表见根 `CMakeLists.txt` 中 `HI_MPP_LIB`
-
-## 注意事项
-
-- 海思 SDK 类型使用 `td_s32`、`ot_vi_pipe` 等前缀，非标准 POSIX 类型
-- VPSS 三通道分辨率：Chn0=2560x1440, Chn1=1280x720, Chn2=640x384
-- 日志宏用法：`LOGGER_INFO(HIMPP, "format %d", val)`，分类名对应 zlog category；可用分类：HIMPP、TEST、STREAM
-- `common_types.h` 中 `VencChannel`/`StreamType`/`CodecType` 等枚举在全局作用域（非 `hiMppMedia` 命名空间）
-- `StreamConsumerManager` 是全局单例（非 `hiMppMedia` 命名空间），通过 `register_consumer()` 注册回调消费码流
-- `test/` 目录用于测试代码，`test_main()` 为测试入口；`test/stream/` 为测试流文件存放处
-- `conf/zlog.conf` 为运行时日志配置，部署到设备 `/app/conf/`
-- 安装时自动清理目标目录，并拷贝 `thirdparty` 中除 MPP 外的 `.so` 到 `lib/`
+- MPP 头/库来自 `thirdparty/hi3516cv610_mpp/`，zlog 来自 `thirdparty/zlog/`。
+- 安装阶段会复制 `thirdparty` 下除 `hi3516cv610_mpp` 目录外的 `.so*` 到 `lib/`；MPP `.so` 不会被安装规则复制。
