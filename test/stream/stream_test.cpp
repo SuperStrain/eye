@@ -99,8 +99,8 @@ void stream_test(int duration_sec, int delay_sec) {
 
     sleep(duration_sec);
 
-    StreamConsumerManager::instance().stop_all();
-    LOGGER_INFO(TEST, "stream_test: all fetchers stopped");
+    // StreamConsumerManager::instance().stop_all();
+    // LOGGER_INFO(TEST, "stream_test: all fetchers stopped");
 
 cleanup:
     for (int i = 0; i < 3; ++i) {
