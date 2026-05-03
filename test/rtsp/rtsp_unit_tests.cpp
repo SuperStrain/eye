@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <deque>
 #include <vector>
 
 static RtspNalUnit make_nal(uint8_t value, uint64_t timestamp) {
@@ -16,12 +17,12 @@ static RtspNalUnit make_nal(uint8_t value, uint64_t timestamp) {
 static void test_queue_drops_whole_access_units() {
     RtspFrameQueue queue(1);
 
-    std::vector<RtspNalUnit> first;
+    std::deque<RtspNalUnit> first;
     first.push_back(make_nal(0x11, 100));
     first.push_back(make_nal(0x12, 100));
     queue.push_access_unit(std::move(first));
 
-    std::vector<RtspNalUnit> second;
+    std::deque<RtspNalUnit> second;
     second.push_back(make_nal(0x21, 200));
     second.push_back(make_nal(0x22, 200));
     queue.push_access_unit(std::move(second));

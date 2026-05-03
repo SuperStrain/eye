@@ -206,7 +206,7 @@ void RtspServer::process_frame_nals(const StreamFrame& frame) {
 
     uint64_t ts = frame.timestamp() > 0 ? frame.timestamp() : 0;
     bool is_idr = frame.is_idr();
-    std::vector<RtspNalUnit> access_unit_nals;
+    std::deque<RtspNalUnit> access_unit_nals;
 
     const FrameData& fd = frame.data();
     for (uint32_t i = 0; i < fd.pack_count; ++i) {

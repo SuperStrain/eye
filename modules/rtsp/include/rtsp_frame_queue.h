@@ -16,7 +16,7 @@ struct RtspNalUnit {
 };
 
 struct RtspAccessUnit {
-    std::vector<RtspNalUnit> nals;
+    std::deque<RtspNalUnit> nals;
 };
 
 class RtspFrameQueue {
@@ -25,7 +25,7 @@ public:
     ~RtspFrameQueue();
 
     void push_nal_unit(RtspNalUnit nal);
-    void push_access_unit(std::vector<RtspNalUnit> nals);
+    void push_access_unit(std::deque<RtspNalUnit> nals);
     bool pop_nal_unit(RtspNalUnit& nal);
     void register_source(RtspStreamSource* source);
     void unregister_source(RtspStreamSource* source);

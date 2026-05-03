@@ -12,12 +12,12 @@ RtspFrameQueue::RtspFrameQueue(size_t max_queue_size)
 RtspFrameQueue::~RtspFrameQueue() {}
 
 void RtspFrameQueue::push_nal_unit(RtspNalUnit nal) {
-    std::vector<RtspNalUnit> nals;
+    std::deque<RtspNalUnit> nals;
     nals.push_back(std::move(nal));
     push_access_unit(std::move(nals));
 }
 
-void RtspFrameQueue::push_access_unit(std::vector<RtspNalUnit> nals) {
+void RtspFrameQueue::push_access_unit(std::deque<RtspNalUnit> nals) {
     if (nals.empty()) return;
 
     std::lock_guard<std::mutex> lock(mutex_);
@@ -41,7 +41,7 @@ bool RtspFrameQueue::pop_nal_unit(RtspNalUnit& nal) {
 
     RtspAccessUnit& access_unit = queue_.front();
     nal = std::move(access_unit.nals.front());
-    access_unit.nals.erase(access_unit.nals.begin());
+    access_unit.nals.pop_front();
     if (access_unit.nals.empty()) {
         queue_.pop_front();
     }
