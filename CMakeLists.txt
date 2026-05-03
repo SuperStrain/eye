@@ -70,6 +70,7 @@ add_subdirectory(modules/core)
 add_subdirectory(modules/interface)
 add_subdirectory(modules/stream)
 add_subdirectory(modules/platform/${TARGET_PLATFORM})
+add_subdirectory(modules/rtsp)
 add_subdirectory(app)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)

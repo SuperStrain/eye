@@ -1,11 +1,11 @@
 #include <iostream>
-#include <vector>
 #include <csignal>
 #include <unistd.h>
 #include "logger.h"
 #include "hi_video_pipeline.h"
 #include "stream_consumer_manager.h"
 #include "hi_stream_fetcher.h"
+#include "rtsp_server.h"
 #include "test.h"
 
 void signal_handler(int sig) {
@@ -34,6 +34,23 @@ int main() {
         std::unique_ptr<StreamFetcher>(new StreamFetcher(
             VencChannel::CHN2, StreamType::VIDEO_MJPEG, CodecType::MJPEG,
             scm.get_distributor(StreamType::VIDEO_MJPEG))));
+
+    auto& rtsp = RtspServer::instance();
+    if (rtsp.start(8554)) {
+        rtsp.add_stream(StreamType::VIDEO_MAIN, "main");
+        rtsp.add_stream(StreamType::VIDEO_SUB, "sub");
+
+        ConsumerConfig rtsp_config;
+        rtsp_config.max_queue_size = 5;
+
+        auto rtsp_cb = [](const StreamFrame& frame) {
+            RtspServer::instance().on_frame(frame);
+        };
+        scm.register_consumer(StreamType::VIDEO_MAIN, rtsp_cb, rtsp_config);
+        scm.register_consumer(StreamType::VIDEO_SUB, rtsp_cb, rtsp_config);
+    } else {
+        LOGGER_ERROR(RTSP, "Failed to start RTSP server, streaming disabled");
+    }
 
     test_main();
 
