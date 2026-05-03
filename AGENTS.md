@@ -27,10 +27,12 @@
 
 ## 运行时路径与日志
 
+- 设备侧当前系统为 ARMv7 Linux `5.10.221` + BusyBox `1.34.1`；`/app` 挂载自 `/dev/ubi1_0`，`/data` 挂载自 `/dev/ubi2_0`，`/run` 是 tmpfs。
+- 设备侧 `eye` 部署并运行在 `/app/bin/eye`；Telnet 验证时进程形态为 `/app/bin/eye`。
 - zlog 配置硬编码为 `/app/conf/zlog.conf`，更新触发文件是 `/app/conf/logupdate`，日志目录是 `/data/eyeLog`。
 - `conf/` 安装到安装前缀的 `conf/`；部署到设备时要保证 `/app/conf/zlog.conf` 存在。
 - 日志分类只定义了 `HIMPP`、`TEST`、`STREAM`；宏用法是 `LOGGER_INFO(HIMPP, "format %d", value)`。
-- `stream_test()` 写设备侧文件：`/run/stream_chn0.h265`、`/run/stream_chn1.h264`、`/run/stream_chn2.mjpeg`。
+- `stream_test()` 写设备侧 tmpfs 文件：`/run/stream_chn0.h265`、`/run/stream_chn1.h264`、`/run/stream_chn2.mjpeg`，重启或清理 `/run` 后不会保留。
 
 ## 第三方与安装
 
