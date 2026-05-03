@@ -15,7 +15,14 @@ void RtspFrameQueue::push_nal_unit(RtspNalUnit nal) {
     std::lock_guard<std::mutex> lock(mutex_);
     while (queue_.size() >= max_queue_size_) {
         queue_.pop_front();
-        LOGGER_WARN(RTSP, "Frame queue overflow, dropping oldest NAL");
+        std::chrono::steady_clock::time_point now =
+            std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(
+                now - last_overflow_log_time_).count() >= 5) {
+            LOGGER_WARN(RTSP,
+                "Frame queue overflow, dropping oldest NAL");
+            last_overflow_log_time_ = now;
+        }
     }
     queue_.push_back(std::move(nal));
 }
@@ -55,4 +62,9 @@ void RtspFrameQueue::notify_active_sources() {
 void RtspFrameQueue::clear() {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_.clear();
+}
+
+bool RtspFrameQueue::has_active_sources() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return !active_sources_.empty();
 }

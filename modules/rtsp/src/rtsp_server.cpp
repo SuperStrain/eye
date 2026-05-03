@@ -228,7 +228,9 @@ void RtspServer::process_frame_nals(const StreamFrame& frame) {
             nal_unit.data = std::move(nal.data);
             nal_unit.timestamp = ts;
             nal_unit.is_idr = nal.is_idr;
-            queue->push_nal_unit(std::move(nal_unit));
+            if (queue->has_active_sources()) {
+                queue->push_nal_unit(std::move(nal_unit));
+            }
         }
     }
 }
