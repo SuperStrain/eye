@@ -7,9 +7,11 @@
 #include <string>
 #include <atomic>
 #include <thread>
+#include <UsageEnvironment.hh>
 #include "common_types.h"
 #include "rtsp_frame_queue.h"
 #include "rtsp_parameter_set_cache.h"
+#include "stream_frame.h"
 
 class RTSPServer;
 class UsageEnvironment;
@@ -51,7 +53,7 @@ private:
     TaskScheduler* scheduler_;
     std::thread event_thread_;
     std::atomic<bool> running_;
-    char watch_variable_;
+    EventLoopWatchVariable watch_variable_;
 
     std::map<StreamType, ServerMediaSession*> sessions_;
     std::map<StreamType, std::shared_ptr<RtspFrameQueue>> frame_queues_;

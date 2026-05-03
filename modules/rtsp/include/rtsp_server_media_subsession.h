@@ -2,6 +2,8 @@
 #define RTSP_SERVER_MEDIA_SUBSESSION_H
 
 #include <liveMedia.hh>
+#include <memory>
+#include <string>
 #include "common_types.h"
 #include "rtsp_frame_queue.h"
 #include "rtsp_parameter_set_cache.h"

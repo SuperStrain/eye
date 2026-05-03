@@ -7,7 +7,6 @@
 
 #include <BasicUsageEnvironment.hh>
 #include <RTSPServer.hh>
-#include <OutPacketBuffer.hh>
 
 RtspServer& RtspServer::instance() {
     static RtspServer inst;
@@ -38,8 +37,6 @@ bool RtspServer::start(uint16_t port) {
     }
 
     config_.port = port;
-
-    OutPacketBuffer::maxSize = 1024 * 1024;
 
     scheduler_ = BasicTaskScheduler::createNew();
     if (!scheduler_) {

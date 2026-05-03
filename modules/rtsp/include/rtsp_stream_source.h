@@ -2,6 +2,7 @@
 #define RTSP_STREAM_SOURCE_H
 
 #include <liveMedia.hh>
+#include <memory>
 #include "rtsp_frame_queue.h"
 #include "common_types.h"
 
