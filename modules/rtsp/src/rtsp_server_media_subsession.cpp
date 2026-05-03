@@ -6,6 +6,10 @@
 #include <H264VideoStreamDiscreteFramer.hh>
 #include <H265VideoStreamDiscreteFramer.hh>
 #include <Base64.hh>
+#include <unistd.h>
+
+static const unsigned kParameterSetWaitAttempts = 50;
+static const useconds_t kParameterSetWaitIntervalUs = 10 * 1000;
 
 static std::string base64_encode(const std::vector<uint8_t>& data) {
     if (data.empty()) return "";
@@ -21,31 +25,54 @@ RtspServerMediaSubsession* RtspServerMediaSubsession::createNew(
     UsageEnvironment& env, StreamType type, CodecType codec,
     std::shared_ptr<RtspFrameQueue> queue,
     std::shared_ptr<ParameterSetCache> param_cache,
+    size_t max_clients,
     bool reuseFirstSource) {
     return new RtspServerMediaSubsession(
-        env, type, codec, queue, param_cache, reuseFirstSource);
+        env, type, codec, queue, param_cache, max_clients, reuseFirstSource);
 }
 
 RtspServerMediaSubsession::RtspServerMediaSubsession(
     UsageEnvironment& env, StreamType type, CodecType codec,
     std::shared_ptr<RtspFrameQueue> queue,
     std::shared_ptr<ParameterSetCache> param_cache,
+    size_t max_clients,
     bool reuseFirstSource)
-    : OnDemandServerMediaSubsession(env, reuseFirstSource),
+    : OnDemandServerMediaSubsession(
+          env, max_clients == 1 ? False : reuseFirstSource),
       stream_type_(type),
       codec_type_(codec),
       frame_queue_(queue),
-      param_cache_(param_cache) {}
+      param_cache_(param_cache),
+      max_clients_(max_clients == 0 ? 1 : max_clients) {}
 
 RtspServerMediaSubsession::~RtspServerMediaSubsession() {}
 
 FramedSource* RtspServerMediaSubsession::createNewStreamSource(
     unsigned clientSessionId, unsigned& estBitrate) {
-    (void)clientSessionId;
+    if (clientSessionId != 0) {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        if (active_client_sessions_.find(clientSessionId) ==
+            active_client_sessions_.end()) {
+            if (active_client_sessions_.size() >= max_clients_) {
+                LOGGER_WARN(RTSP,
+                    "Reject RTSP client %u for stream type %d: max_clients=%zu",
+                    clientSessionId, static_cast<int>(stream_type_),
+                    max_clients_);
+                return NULL;
+            }
+            active_client_sessions_.insert(clientSessionId);
+        }
+    }
 
     RtspStreamSource* source = RtspStreamSource::createNew(
         envir(), stream_type_, codec_type_, frame_queue_);
-    if (!source) return NULL;
+    if (!source) {
+        if (clientSessionId != 0) {
+            std::lock_guard<std::mutex> lock(client_mutex_);
+            active_client_sessions_.erase(clientSessionId);
+        }
+        return NULL;
+    }
 
     estBitrate = (codec_type_ == CodecType::H265) ? 4000 : 2000;
 
@@ -71,6 +98,17 @@ RTPSink* RtspServerMediaSubsession::createNewRTPSink(
 char const* RtspServerMediaSubsession::getAuxSDPLine(
     RTPSink* rtpSink, FramedSource* /*inputSource*/) {
     if (!param_cache_) return NULL;
+
+    for (unsigned i = 0; i < kParameterSetWaitAttempts; ++i) {
+        {
+            std::lock_guard<std::mutex> lock(param_cache_->mutex);
+            bool ready = (codec_type_ == CodecType::H265)
+                             ? param_cache_->has_vps_sps_pps()
+                             : param_cache_->has_sps_pps();
+            if (ready) break;
+        }
+        usleep(kParameterSetWaitIntervalUs);
+    }
 
     std::lock_guard<std::mutex> lock(param_cache_->mutex);
 
@@ -111,4 +149,14 @@ char const* RtspServerMediaSubsession::getAuxSDPLine(
     }
 
     return aux_sdp_line_.c_str();
+}
+
+void RtspServerMediaSubsession::deleteStream(unsigned clientSessionId,
+                                             void*& streamToken) {
+    if (clientSessionId != 0) {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        active_client_sessions_.erase(clientSessionId);
+    }
+
+    OnDemandServerMediaSubsession::deleteStream(clientSessionId, streamToken);
 }

@@ -12,29 +12,52 @@ RtspFrameQueue::RtspFrameQueue(size_t max_queue_size)
 RtspFrameQueue::~RtspFrameQueue() {}
 
 void RtspFrameQueue::push_nal_unit(RtspNalUnit nal) {
+    std::vector<RtspNalUnit> nals;
+    nals.push_back(std::move(nal));
+    push_access_unit(std::move(nals));
+}
+
+void RtspFrameQueue::push_access_unit(std::vector<RtspNalUnit> nals) {
+    if (nals.empty()) return;
+
     std::lock_guard<std::mutex> lock(mutex_);
     while (queue_.size() >= max_queue_size_) {
-        queue_.pop_front();
-        std::chrono::steady_clock::time_point now =
-            std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(
-                now - last_overflow_log_time_).count() >= 5) {
-            LOGGER_WARN(RTSP,
-                "Frame queue overflow, dropping oldest NAL");
-            last_overflow_log_time_ = now;
-        }
+        drop_oldest_access_unit_locked();
     }
-    queue_.push_back(std::move(nal));
+
+    RtspAccessUnit access_unit;
+    access_unit.nals = std::move(nals);
+    queue_.push_back(std::move(access_unit));
 }
 
 bool RtspFrameQueue::pop_nal_unit(RtspNalUnit& nal) {
     std::lock_guard<std::mutex> lock(mutex_);
+    while (!queue_.empty() && queue_.front().nals.empty()) {
+        queue_.pop_front();
+    }
     if (queue_.empty()) {
         return false;
     }
-    nal = std::move(queue_.front());
-    queue_.pop_front();
+
+    RtspAccessUnit& access_unit = queue_.front();
+    nal = std::move(access_unit.nals.front());
+    access_unit.nals.erase(access_unit.nals.begin());
+    if (access_unit.nals.empty()) {
+        queue_.pop_front();
+    }
     return true;
+}
+
+void RtspFrameQueue::drop_oldest_access_unit_locked() {
+    queue_.pop_front();
+    std::chrono::steady_clock::time_point now =
+        std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::seconds>(
+            now - last_overflow_log_time_).count() >= 5) {
+        LOGGER_WARN(RTSP,
+            "Frame queue overflow, dropping oldest access unit");
+        last_overflow_log_time_ = now;
+    }
 }
 
 void RtspFrameQueue::register_source(RtspStreamSource* source) {

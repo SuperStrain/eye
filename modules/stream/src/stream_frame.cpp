@@ -1,8 +1,30 @@
 #include "stream_frame.h"
 
+#include <algorithm>
+#include <chrono>
+#include <mutex>
+
+static uint64_t next_monotonic_timestamp_ms() {
+    using namespace std::chrono;
+
+    static std::mutex timestamp_mutex;
+    static uint64_t last_timestamp = 0;
+
+    uint64_t now = static_cast<uint64_t>(
+        duration_cast<milliseconds>(
+            system_clock::now().time_since_epoch()).count());
+
+    std::lock_guard<std::mutex> lock(timestamp_mutex);
+    if (now <= last_timestamp) {
+        now = last_timestamp + 1;
+    }
+    last_timestamp = now;
+    return now;
+}
+
 StreamFrame::StreamFrame(VencChannel chn, StreamType type, CodecType codec, const FrameData& data)
     : channel_(chn), type_(type), codec_type_(codec), frame_data_(data) {
-    timestamp_ = 0;  // FrameData 中无 pts 字段，暂设为0
+    timestamp_ = next_monotonic_timestamp_ms();
 
     // 深拷贝 pack 数据，避免上游释放 buffer 后产生悬空指针
     if (frame_data_.pack_count > 0) {

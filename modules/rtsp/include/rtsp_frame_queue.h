@@ -15,12 +15,17 @@ struct RtspNalUnit {
     bool is_idr;
 };
 
+struct RtspAccessUnit {
+    std::vector<RtspNalUnit> nals;
+};
+
 class RtspFrameQueue {
 public:
     explicit RtspFrameQueue(size_t max_queue_size);
     ~RtspFrameQueue();
 
     void push_nal_unit(RtspNalUnit nal);
+    void push_access_unit(std::vector<RtspNalUnit> nals);
     bool pop_nal_unit(RtspNalUnit& nal);
     void register_source(RtspStreamSource* source);
     void unregister_source(RtspStreamSource* source);
@@ -29,7 +34,9 @@ public:
     bool has_active_sources() const;
 
 private:
-    std::deque<RtspNalUnit> queue_;
+    void drop_oldest_access_unit_locked();
+
+    std::deque<RtspAccessUnit> queue_;
     std::vector<RtspStreamSource*> active_sources_;
     mutable std::mutex mutex_;
     size_t max_queue_size_;
