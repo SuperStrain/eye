@@ -11,8 +11,9 @@
 
 #define LOG_CATEGORY_LIST \
     X(HIMPP)              \
-    X(TEST)              \
-    X(STREAM)
+    X(TEST)               \
+    X(STREAM)             \
+    X(RTSP)
 
 enum LogCategory {
 #define X(name) name,
