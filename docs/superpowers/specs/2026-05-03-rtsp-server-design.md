@@ -284,5 +284,68 @@ target_link_libraries(eye PRIVATE platform_hi stream rtsp)
 
 ## 前置依赖
 
-- live555 使用 `arm-v01c02-linux-musleabi-` 工具链交叉编译为 ARM 静态库
-- live555 源码版本建议：live.2024.xx（稳定版）
+### live555 版本选择
+
+- **版本**：live555 最新版（从 https://download.live555.com/live555-latest.tar.gz 下载）
+- **编译选项**：必须添加 `-DNO_STD_LIB` 以避免 C++20 依赖
+- **原因**：live555 自 2023.06.16 版本起使用 `std::atomic_flag::test()`（C++20 特性）。本项目使用 C++11（`CMAKE_CXX_STANDARD 11`），交叉编译器为 GCC 10.3.0。通过 `-DNO_STD_LIB` 使用 `Boolean volatile` 替代 `std::atomic_flag`，这是 live555 官方推荐的兼容方案
+- **工具链**：`arm-v01c02-linux-musleabi-`（GCC 10.3.0, musl-1.2.3, 目标 ARM Cortex-A7）
+
+### 交叉编译步骤
+
+1. 下载并解压 live555 最新源码：
+```bash
+cd /tmp
+wget https://download.live555.com/live555-latest.tar.gz
+tar xzf live555-latest.tar.gz
+cd live
+```
+
+2. 创建交叉编译配置文件 `config.arm-v01c02`：
+```
+CROSS_COMPILE?=         arm-v01c02-linux-musleabi-
+COMPILE_OPTS =          $(INCLUDES) -I. -O2 -DSOCKLEN_T=socklen_t -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64 -DNO_STD_LIB
+C_COMPILER =            $(CROSS_COMPILE)gcc
+C_FLAGS =               $(COMPILE_OPTS)
+CPP =                   $(CROSS_COMPILE)cpp
+CPLUSPLUS_COMPILER =    $(CROSS_COMPILE)g++
+CPLUSPLUS_FLAGS =       $(COMPILE_OPTS) -Wall -DBSD=1
+LINK =                  $(CROSS_COMPILE)g++ -o
+LINK_OPTS =             -L.
+CONSOLE_LINK_OPTS =     $(LINK_OPTS)
+LIBRARY_LINK =          $(CROSS_COMPILE)ar cr
+LIBRARY_LINK_OPTS =
+LIB_SUFFIX =            a
+LIBS_FOR_CONSOLE_APPLICATION =
+LIBS_FOR_GUI_APPLICATION =
+EXE =
+```
+
+3. 编译：
+```bash
+./genMakefiles arm-v01c02
+make
+```
+
+4. 将产出物部署到项目 `thirdparty/`：
+```bash
+# 头文件
+mkdir -p <eye_project>/thirdparty/live555/include
+cp -r liveMedia/include <eye_project>/thirdparty/live555/include/liveMedia
+cp -r groupsock/include <eye_project>/thirdparty/live555/include/groupsock
+cp -r BasicUsageEnvironment/include <eye_project>/thirdparty/live555/include/BasicUsageEnvironment
+cp -r UsageEnvironment/include <eye_project>/thirdparty/live555/include/UsageEnvironment
+
+# 静态库
+mkdir -p <eye_project>/thirdparty/live555/lib
+cp liveMedia/libliveMedia.a <eye_project>/thirdparty/live555/lib/
+cp groupsock/libgroupsock.a <eye_project>/thirdparty/live555/lib/
+cp BasicUsageEnvironment/libBasicUsageEnvironment.a <eye_project>/thirdparty/live555/lib/
+cp UsageEnvironment/libUsageEnvironment.a <eye_project>/thirdparty/live555/lib/
+```
+
+### 注意事项
+
+- `-DNO_STD_LIB` 会将 `std::atomic_flag` 替换为 `Boolean volatile`，在高并发场景下理论上存在极小概率竞态，但本场景为单客户端 RTSP 服务端，影响可忽略
+- live555 官方不维护旧版本，不建议使用 2023.06.16 之前的版本来回避 C++20 问题（缺少安全修复）
+- live555 头文件本身不使用 C++20 特性，`-DNO_STD_LIB` 仅影响 live555 内部实现，不影响 eye 项目的 C++11 编译
