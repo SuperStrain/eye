@@ -16,7 +16,10 @@ RtspStreamSource::RtspStreamSource(
       frame_queue_(queue),
       stream_type_(type),
       codec_type_(codec),
-      awaiting_frame_(false) {
+      awaiting_frame_(false),
+      nal_count_(0),
+      first_presentation_time_(),
+      first_frame_delivered_(false) {
     if (frame_queue_) {
         frame_queue_->register_source(this);
     }
@@ -53,20 +56,20 @@ void RtspStreamSource::deliver_frame(RtspStreamSource* source) {
 
     RtspNalUnit nal;
     if (!source->frame_queue_->pop_nal_unit(nal)) {
-        source->awaiting_frame_ = true;
+        source->awaiting_frame_ = false;
+        source->envir().taskScheduler().scheduleDelayedTask(
+            1000, (TaskFunc*)deliver_frame, source);
         return;
     }
 
     if (nal.data.size() > source->fMaxSize) {
-        source->fNumTruncatedBytes =
-            static_cast<unsigned>(nal.data.size() - source->fMaxSize);
-        memcpy(source->fTo, nal.data.data(), source->fMaxSize);
-        source->fFrameSize = source->fMaxSize;
-        LOGGER_WARN(RTSP,
-            "NAL truncated: type=%d size=%zu max=%u truncated=%u",
+        LOGGER_ERROR(RTSP,
+            "NAL too large, dropping: type=%d size=%zu max=%u",
             static_cast<int>(source->stream_type_),
-            nal.data.size(), source->fMaxSize,
-            source->fNumTruncatedBytes);
+            nal.data.size(), source->fMaxSize);
+        source->envir().taskScheduler().scheduleDelayedTask(
+            0, (TaskFunc*)deliver_frame, source);
+        return;
     } else {
         source->fFrameSize = static_cast<unsigned>(nal.data.size());
         source->fNumTruncatedBytes = 0;
@@ -74,12 +77,29 @@ void RtspStreamSource::deliver_frame(RtspStreamSource* source) {
     }
 
     static const uint32_t kDefaultFps = 30;
+    static const uint32_t kFrameDurationUs = 1000000 / kDefaultFps;
+
+    if (!source->first_frame_delivered_) {
+        gettimeofday(&source->first_presentation_time_, NULL);
+        source->first_frame_delivered_ = true;
+        source->nal_count_ = 0;
+    }
+
+    source->nal_count_++;
+    uint64_t elapsed_us =
+        static_cast<uint64_t>(source->nal_count_) * kFrameDurationUs;
     source->fPresentationTime.tv_sec =
-        static_cast<time_t>(nal.timestamp / 1000);
+        source->first_presentation_time_.tv_sec
+        + static_cast<time_t>(elapsed_us / 1000000);
     source->fPresentationTime.tv_usec =
-        static_cast<suseconds_t>((nal.timestamp % 1000) * 1000);
-    source->fDurationInMicroseconds =
-        static_cast<unsigned>(1000000 / kDefaultFps);
+        source->first_presentation_time_.tv_usec
+        + static_cast<suseconds_t>(elapsed_us % 1000000);
+    if (source->fPresentationTime.tv_usec >= 1000000) {
+        source->fPresentationTime.tv_sec +=
+            source->fPresentationTime.tv_usec / 1000000;
+        source->fPresentationTime.tv_usec %= 1000000;
+    }
+    source->fDurationInMicroseconds = kFrameDurationUs;
 
     FramedSource::afterGetting(source);
 }

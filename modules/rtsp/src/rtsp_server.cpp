@@ -21,7 +21,7 @@ RtspServer::RtspServer()
       watch_variable_(0),
       frame_event_trigger_(0) {
     config_.port = 8554;
-    config_.frame_queue_size = 5;
+    config_.frame_queue_size = 15;
     config_.reuse_first_source = true;
     config_.max_clients = 1;
 }

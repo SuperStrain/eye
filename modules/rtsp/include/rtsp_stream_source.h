@@ -32,6 +32,9 @@ private:
     StreamType stream_type_;
     CodecType codec_type_;
     bool awaiting_frame_;
+    uint32_t nal_count_;
+    struct timeval first_presentation_time_;
+    bool first_frame_delivered_;
 };
 
 #endif
