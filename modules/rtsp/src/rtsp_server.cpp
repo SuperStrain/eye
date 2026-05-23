@@ -139,6 +139,11 @@ bool RtspServer::add_stream(StreamType type,
 
     std::shared_ptr<RtspFrameQueue> queue(
         new RtspFrameQueue(config_.frame_queue_size));
+    std::map<StreamType, std::function<void()>>::iterator cb_it =
+        overflow_callbacks_.find(type);
+    if (cb_it != overflow_callbacks_.end()) {
+        queue->set_overflow_callback(cb_it->second);
+    }
     std::shared_ptr<ParameterSetCache> cache(new ParameterSetCache());
 
     ServerMediaSession* sms = ServerMediaSession::createNew(
@@ -179,6 +184,17 @@ void RtspServer::remove_stream(StreamType type) {
     frame_queues_.erase(type);
     parameter_sets_.erase(type);
     stream_codecs_.erase(type);
+    overflow_callbacks_.erase(type);
+}
+
+void RtspServer::set_overflow_callback(StreamType type,
+                                       std::function<void()> callback) {
+    overflow_callbacks_[type] = callback;
+    std::map<StreamType, std::shared_ptr<RtspFrameQueue>>::iterator it =
+        frame_queues_.find(type);
+    if (it != frame_queues_.end()) {
+        it->second->set_overflow_callback(callback);
+    }
 }
 
 void RtspServer::on_frame(const StreamFrame& frame) {

@@ -99,7 +99,7 @@ private:
     td_void comm_venc_set_gop_attr(ot_payload_type type, ot_venc_chn_attr *chn_attr,
     ot_venc_gop_attr *gop_attr);
 
-    td_s32 comm_venc_close_reencode(ot_venc_chn venc_chn);
+    td_s32 comm_venc_configure_rc(ot_venc_chn venc_chn, const venc_chn_param *chn_param);
 
 public:
 
@@ -303,7 +303,8 @@ td_s32 videoProcessHi::videoImpl::comm_venc_channel_param_init(venc_chn_param *c
     return s32Ret;
 }
 
-td_s32 videoProcessHi::videoImpl::comm_venc_close_reencode(ot_venc_chn venc_chn)
+td_s32 videoProcessHi::videoImpl::comm_venc_configure_rc(
+    ot_venc_chn venc_chn, const venc_chn_param *chn_param)
 {
     td_s32 ret;
     ot_venc_rc_param rc_param;
@@ -321,7 +322,13 @@ td_s32 videoProcessHi::videoImpl::comm_venc_close_reencode(ot_venc_chn venc_chn)
         return TD_FAILURE;
     }
 
-    if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_ABR) {
+    if (venc_chn == venc_chn0 && chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H265_CBR) {
+        rc_param.h265_cbr_param.max_i_proportion = 8;
+        rc_param.h265_cbr_param.min_i_qp = 22;
+        rc_param.h265_cbr_param.max_reencode_times = 2;
+        rc_param.scene_chg_detect.detect_scene_chg_en = TD_TRUE;
+        rc_param.scene_chg_detect.adapt_insert_idr_frame_en = TD_TRUE;
+    } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_ABR) {
         rc_param.h264_abr_param.max_reencode_times = 0;
     } else if (chn_attr.rc_attr.rc_mode == OT_VENC_RC_MODE_H264_CBR) {
         rc_param.h264_cbr_param.max_reencode_times = 0;
@@ -367,6 +374,26 @@ td_s32 videoProcessHi::videoImpl::comm_venc_close_reencode(ot_venc_chn venc_chn)
         return TD_FAILURE;
     }
 
+    if (venc_chn == venc_chn0 && chn_param && chn_param->type == OT_PT_H265) {
+        ot_venc_super_frame_strategy super_frame_param = {};
+        super_frame_param.super_frame_mode = OT_VENC_SUPER_FRAME_REENCODE;
+        super_frame_param.i_frame_bits_threshold = 1280 * 1000;
+        super_frame_param.p_frame_bits_threshold = 640 * 1000;
+        super_frame_param.b_frame_bits_threshold = 640 * 1000;
+        super_frame_param.reencode_priority = OT_VENC_REENCODE_FRAME_BITS_FIRST;
+        ret = ss_mpi_venc_set_super_frame_strategy(venc_chn, &super_frame_param);
+        if (ret != TD_SUCCESS) {
+            LOGGER_ERROR(HIMPP, "SetSuperFrameStrategy failed! ret=%#x", ret);
+            return TD_FAILURE;
+        }
+        LOGGER_INFO(HIMPP,
+            "main stream RC tuned: max_i_proportion=%u min_i_qp=%u super_i_bits=%u super_p_bits=%u",
+            rc_param.h265_cbr_param.max_i_proportion,
+            rc_param.h265_cbr_param.min_i_qp,
+            super_frame_param.i_frame_bits_threshold,
+            super_frame_param.p_frame_bits_threshold);
+    }
+
     return TD_SUCCESS;
 }
 
@@ -398,7 +425,7 @@ td_s32 videoProcessHi::videoImpl::comm_venc_create(ot_venc_chn venc_chn, venc_ch
         return TD_SUCCESS;
     }
 
-    if ((s32Ret = comm_venc_close_reencode(venc_chn)) != TD_SUCCESS) {
+    if ((s32Ret = comm_venc_configure_rc(venc_chn, chn_param)) != TD_SUCCESS) {
         ss_mpi_venc_destroy_chn(venc_chn);
         return s32Ret;
     }
@@ -703,6 +730,18 @@ int videoProcessHi::stopChannel(int chn)
 {
     // Stub implementation - stop encoding channel
     (void)chn;
+    return TD_SUCCESS;
+}
+
+int videoProcessHi::requestIdr(int chn, bool instant)
+{
+    td_s32 ret = ss_mpi_venc_request_idr(
+        static_cast<ot_venc_chn>(chn), instant ? TD_TRUE : TD_FALSE);
+    if (ret != TD_SUCCESS) {
+        LOGGER_ERROR(HIMPP, "request IDR ch%d failed, ret=%#x", chn, ret);
+        return TD_FAILURE;
+    }
+    LOGGER_INFO(HIMPP, "request IDR ch%d instant=%d", chn, instant ? 1 : 0);
     return TD_SUCCESS;
 }
 

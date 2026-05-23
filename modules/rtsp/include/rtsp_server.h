@@ -2,6 +2,7 @@
 #define RTSP_SERVER_H
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -34,6 +35,7 @@ public:
 
     bool add_stream(StreamType type, const std::string& stream_name);
     void remove_stream(StreamType type);
+    void set_overflow_callback(StreamType type, std::function<void()> callback);
 
     void on_frame(const StreamFrame& frame);
 
@@ -59,6 +61,7 @@ private:
     std::map<StreamType, std::shared_ptr<RtspFrameQueue>> frame_queues_;
     std::map<StreamType, std::shared_ptr<ParameterSetCache>> parameter_sets_;
     std::map<StreamType, CodecType> stream_codecs_;
+    std::map<StreamType, std::function<void()>> overflow_callbacks_;
     EventTriggerId frame_event_trigger_;
 
     RtspConfig config_;

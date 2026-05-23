@@ -29,22 +29,35 @@ void RtspFrameQueue::push_access_unit(std::deque<RtspNalUnit> nals) {
     if (nals.empty()) return;
 
     bool has_idr = access_unit_has_idr(nals);
+    std::function<void()> overflow_callback;
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (queue_.size() >= max_queue_size_) {
-        drop_oldest_access_unit_locked();
-    }
-
-    if (waiting_for_idr_after_drop_) {
-        if (!has_idr) {
-            return;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (queue_.size() >= max_queue_size_) {
+            drop_oldest_access_unit_locked();
+            if (!has_idr) {
+                overflow_callback = overflow_callback_;
+            }
         }
-        waiting_for_idr_after_drop_ = false;
+
+        if (waiting_for_idr_after_drop_) {
+            if (!has_idr) {
+                nals.clear();
+            } else {
+                waiting_for_idr_after_drop_ = false;
+            }
+        }
+
+        if (!nals.empty()) {
+            RtspAccessUnit access_unit;
+            access_unit.nals = std::move(nals);
+            queue_.push_back(std::move(access_unit));
+        }
     }
 
-    RtspAccessUnit access_unit;
-    access_unit.nals = std::move(nals);
-    queue_.push_back(std::move(access_unit));
+    if (overflow_callback) {
+        overflow_callback();
+    }
 }
 
 bool RtspFrameQueue::pop_nal_unit(RtspNalUnit& nal) {
@@ -116,4 +129,9 @@ void RtspFrameQueue::clear() {
 bool RtspFrameQueue::has_active_sources() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return !active_sources_.empty();
+}
+
+void RtspFrameQueue::set_overflow_callback(std::function<void()> callback) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    overflow_callback_ = std::move(callback);
 }

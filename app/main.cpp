@@ -39,6 +39,10 @@ int main() {
     if (rtsp.start(8554)) {
         rtsp.add_stream(StreamType::VIDEO_MAIN, "main");
         rtsp.add_stream(StreamType::VIDEO_SUB, "sub");
+        rtsp.set_overflow_callback(StreamType::VIDEO_MAIN, []() {
+            hiMppMedia::videoProcessHi::getInstance().requestIdr(
+                static_cast<int>(VencChannel::CHN0), true);
+        });
 
         ConsumerConfig rtsp_config;
         rtsp_config.max_queue_size = 30;

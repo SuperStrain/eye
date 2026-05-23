@@ -34,6 +34,7 @@ public:
     int destroyChannel(int chn) override;
     int startChannel(int chn) override;
     int stopChannel(int chn) override;
+    int requestIdr(int chn, bool instant) override;
 
 private:
 

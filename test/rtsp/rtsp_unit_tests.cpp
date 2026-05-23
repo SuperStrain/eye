@@ -90,6 +90,40 @@ static void test_queue_discards_stale_p_frames_when_new_idr_overflows() {
     assert(!queue.pop_nal_unit(nal));
 }
 
+static void test_queue_does_not_request_idr_when_overflow_frame_is_idr() {
+    RtspFrameQueue queue(1);
+    int overflow_count = 0;
+    queue.set_overflow_callback([&overflow_count] { ++overflow_count; });
+
+    std::deque<RtspNalUnit> first;
+    first.push_back(make_nal(0x11, 100, true));
+    queue.push_access_unit(std::move(first));
+    assert(overflow_count == 0);
+
+    std::deque<RtspNalUnit> second;
+    second.push_back(make_nal(0x21, 200, true));
+    queue.push_access_unit(std::move(second));
+    assert(overflow_count == 0);
+}
+
+static void test_queue_notifies_overflow_even_when_new_frame_is_not_idr() {
+    RtspFrameQueue queue(1);
+    int overflow_count = 0;
+    queue.set_overflow_callback([&overflow_count] { ++overflow_count; });
+
+    std::deque<RtspNalUnit> first;
+    first.push_back(make_nal(0x11, 100, true));
+    queue.push_access_unit(std::move(first));
+
+    std::deque<RtspNalUnit> second;
+    second.push_back(make_nal(0x21, 200, false));
+    queue.push_access_unit(std::move(second));
+
+    RtspNalUnit nal;
+    assert(!queue.pop_nal_unit(nal));
+    assert(overflow_count == 1);
+}
+
 static void test_stream_frame_timestamp_is_non_zero_and_monotonic() {
     uint8_t data[] = {0x65, 0x88};
     FrameData frame_data = {};
@@ -111,6 +145,8 @@ int main() {
     test_queue_drops_whole_access_units();
     test_queue_skips_non_idr_after_overflow_until_next_idr();
     test_queue_discards_stale_p_frames_when_new_idr_overflows();
+    test_queue_does_not_request_idr_when_overflow_frame_is_idr();
+    test_queue_notifies_overflow_even_when_new_frame_is_not_idr();
     test_stream_frame_timestamp_is_non_zero_and_monotonic();
     return 0;
 }

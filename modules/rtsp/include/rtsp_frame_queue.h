@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <chrono>
 #include <deque>
+#include <functional>
 #include <mutex>
 #include <vector>
 
@@ -32,6 +33,7 @@ public:
     void notify_active_sources();
     void clear();
     bool has_active_sources() const;
+    void set_overflow_callback(std::function<void()> callback);
 
 private:
     void drop_oldest_access_unit_locked();
@@ -41,6 +43,7 @@ private:
     mutable std::mutex mutex_;
     size_t max_queue_size_;
     bool waiting_for_idr_after_drop_;
+    std::function<void()> overflow_callback_;
     mutable std::chrono::steady_clock::time_point last_overflow_log_time_;
 };
 

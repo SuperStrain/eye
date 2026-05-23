@@ -11,6 +11,7 @@ public:
     virtual int destroyChannel(int chn) = 0;
     virtual int startChannel(int chn) = 0;
     virtual int stopChannel(int chn) = 0;
+    virtual int requestIdr(int chn, bool instant) = 0;
 };
 
 #endif
