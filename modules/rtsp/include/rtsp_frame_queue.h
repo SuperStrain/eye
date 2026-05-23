@@ -40,6 +40,7 @@ private:
     std::vector<RtspStreamSource*> active_sources_;
     mutable std::mutex mutex_;
     size_t max_queue_size_;
+    bool waiting_for_idr_after_drop_;
     mutable std::chrono::steady_clock::time_point last_overflow_log_time_;
 };
 

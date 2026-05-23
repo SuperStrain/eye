@@ -41,7 +41,7 @@ int main() {
         rtsp.add_stream(StreamType::VIDEO_SUB, "sub");
 
         ConsumerConfig rtsp_config;
-        rtsp_config.max_queue_size = 5;
+        rtsp_config.max_queue_size = 30;
 
         auto rtsp_cb = [](const StreamFrame& frame) {
             RtspServer::instance().on_frame(frame);

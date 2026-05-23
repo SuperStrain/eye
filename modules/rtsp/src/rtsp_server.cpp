@@ -6,6 +6,7 @@
 #include "stream_frame.h"
 
 #include <BasicUsageEnvironment.hh>
+#include <MediaSink.hh>
 #include <RTSPServer.hh>
 
 RtspServer& RtspServer::instance() {
@@ -21,7 +22,7 @@ RtspServer::RtspServer()
       watch_variable_(0),
       frame_event_trigger_(0) {
     config_.port = 8554;
-    config_.frame_queue_size = 5;
+    config_.frame_queue_size = 30;
     config_.reuse_first_source = true;
     config_.max_clients = 1;
 }
@@ -37,6 +38,8 @@ bool RtspServer::start(uint16_t port) {
     }
 
     config_.port = port;
+
+    OutPacketBuffer::maxSize = 1024 * 1024;
 
     scheduler_ = BasicTaskScheduler::createNew();
     if (!scheduler_) {

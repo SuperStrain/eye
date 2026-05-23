@@ -2,8 +2,16 @@
 #include "rtsp_stream_source.h"
 #include "logger.h"
 
+static bool access_unit_has_idr(const std::deque<RtspNalUnit>& nals) {
+    for (const RtspNalUnit& nal : nals) {
+        if (nal.is_idr) return true;
+    }
+    return false;
+}
+
 RtspFrameQueue::RtspFrameQueue(size_t max_queue_size)
-    : max_queue_size_(max_queue_size) {
+    : max_queue_size_(max_queue_size),
+      waiting_for_idr_after_drop_(false) {
     if (max_queue_size_ == 0) {
         max_queue_size_ = 1;
     }
@@ -20,9 +28,18 @@ void RtspFrameQueue::push_nal_unit(RtspNalUnit nal) {
 void RtspFrameQueue::push_access_unit(std::deque<RtspNalUnit> nals) {
     if (nals.empty()) return;
 
+    bool has_idr = access_unit_has_idr(nals);
+
     std::lock_guard<std::mutex> lock(mutex_);
-    while (queue_.size() >= max_queue_size_) {
+    if (queue_.size() >= max_queue_size_) {
         drop_oldest_access_unit_locked();
+    }
+
+    if (waiting_for_idr_after_drop_) {
+        if (!has_idr) {
+            return;
+        }
+        waiting_for_idr_after_drop_ = false;
     }
 
     RtspAccessUnit access_unit;
@@ -49,13 +66,21 @@ bool RtspFrameQueue::pop_nal_unit(RtspNalUnit& nal) {
 }
 
 void RtspFrameQueue::drop_oldest_access_unit_locked() {
-    queue_.pop_front();
+    bool dropped_idr = access_unit_has_idr(queue_.front().nals);
+    queue_.clear();
+    waiting_for_idr_after_drop_ = true;
+
     std::chrono::steady_clock::time_point now =
         std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::seconds>(
             now - last_overflow_log_time_).count() >= 5) {
-        LOGGER_WARN(RTSP,
-            "Frame queue overflow, dropping oldest access unit");
+        if (dropped_idr) {
+            LOGGER_WARN(RTSP,
+                "Frame queue overflow, dropping IDR access unit, skipping frames until next IDR");
+        } else {
+            LOGGER_WARN(RTSP,
+                "Frame queue overflow, dropping non-IDR access unit, reference chain broken, skipping P-frames until next IDR");
+        }
         last_overflow_log_time_ = now;
     }
 }
@@ -85,6 +110,7 @@ void RtspFrameQueue::notify_active_sources() {
 void RtspFrameQueue::clear() {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_.clear();
+    waiting_for_idr_after_drop_ = false;
 }
 
 bool RtspFrameQueue::has_active_sources() const {
