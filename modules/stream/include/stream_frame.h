@@ -16,6 +16,9 @@ public:
     StreamType type() const { return type_; }
     CodecType codec_type() const { return codec_type_; }
     uint64_t timestamp() const { return timestamp_; }
+    uint64_t frame_id() const { return frame_id_; }
+    NaluType frame_type() const;
+    size_t frame_size() const;
     bool is_idr() const;
     const FrameData& data() const { return frame_data_; }
 
@@ -24,6 +27,7 @@ private:
     StreamType type_;
     CodecType codec_type_;
     uint64_t timestamp_;
+    uint64_t frame_id_;
     FrameData frame_data_;
     std::vector<std::vector<uint8_t>> pack_data_;
 };

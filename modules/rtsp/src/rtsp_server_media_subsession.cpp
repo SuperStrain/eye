@@ -73,6 +73,10 @@ FramedSource* RtspServerMediaSubsession::createNewStreamSource(
         }
         return NULL;
     }
+    if (clientSessionId != 0) {
+        LOGGER_INFO(RTSP, "RTSP client %u started stream type %d",
+                    clientSessionId, static_cast<int>(stream_type_));
+    }
 
     estBitrate = (codec_type_ == CodecType::H265) ? 4000 : 2000;
 
@@ -156,6 +160,8 @@ void RtspServerMediaSubsession::deleteStream(unsigned clientSessionId,
     if (clientSessionId != 0) {
         std::lock_guard<std::mutex> lock(client_mutex_);
         active_client_sessions_.erase(clientSessionId);
+        LOGGER_INFO(RTSP, "RTSP client %u stopped stream type %d",
+                    clientSessionId, static_cast<int>(stream_type_));
     }
 
     OnDemandServerMediaSubsession::deleteStream(clientSessionId, streamToken);

@@ -3,11 +3,22 @@
 #include "rtsp_nal_parser.h"
 #include "rtsp_stream_source.h"
 #include "logger.h"
+#include "stream_distributor.h"
 #include "stream_frame.h"
 
 #include <BasicUsageEnvironment.hh>
 #include <MediaSink.hh>
 #include <RTSPServer.hh>
+#include <chrono>
+
+static const char* frame_type_name(NaluType type) {
+    switch (type) {
+        case NaluType::IDR_SLICE: return "IDR";
+        case NaluType::P_SLICE: return "P";
+        case NaluType::B_SLICE: return "B";
+        default: return "OTHER";
+    }
+}
 
 RtspServer& RtspServer::instance() {
     static RtspServer inst;
@@ -20,7 +31,13 @@ RtspServer::RtspServer()
       scheduler_(NULL),
       running_(false),
       watch_variable_(0),
-      frame_event_trigger_(0) {
+      frame_event_trigger_(0),
+      main_stats_start_(std::chrono::steady_clock::now()),
+      main_debug_log_time_(main_stats_start_),
+      main_interval_frames_(0),
+      main_interval_bytes_(0),
+      main_interval_process_cost_us_(0),
+      main_total_idr_frames_(0) {
     config_.port = 8554;
     config_.frame_queue_size = 30;
     config_.reuse_first_source = true;
@@ -197,27 +214,41 @@ void RtspServer::set_overflow_callback(StreamType type,
     }
 }
 
+void RtspServer::set_main_consumer_stats_provider(
+    std::function<bool(ConsumerStats&)> provider) {
+    main_consumer_stats_provider_ = std::move(provider);
+}
+
 void RtspServer::on_frame(const StreamFrame& frame) {
     if (!running_.load()) return;
 
-    process_frame_nals(frame);
+    std::chrono::steady_clock::time_point start =
+        std::chrono::steady_clock::now();
+    size_t nal_count = process_frame_nals(frame);
+    uint64_t process_cost_us = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - start).count());
+
+    if (frame.type() == StreamType::VIDEO_MAIN) {
+        log_main_stream_stats(frame, nal_count, process_cost_us);
+    }
 
     if (scheduler_) {
         scheduler_->triggerEvent(frame_event_trigger_, this);
     }
 }
 
-void RtspServer::process_frame_nals(const StreamFrame& frame) {
+size_t RtspServer::process_frame_nals(const StreamFrame& frame) {
     std::map<StreamType, CodecType>::iterator codec_it = stream_codecs_.find(frame.type());
-    if (codec_it == stream_codecs_.end()) return;
+    if (codec_it == stream_codecs_.end()) return 0;
 
     std::map<StreamType, std::shared_ptr<RtspFrameQueue>>::iterator queue_it =
         frame_queues_.find(frame.type());
-    if (queue_it == frame_queues_.end()) return;
+    if (queue_it == frame_queues_.end()) return 0;
 
     std::map<StreamType, std::shared_ptr<ParameterSetCache>>::iterator param_it =
         parameter_sets_.find(frame.type());
-    if (param_it == parameter_sets_.end()) return;
+    if (param_it == parameter_sets_.end()) return 0;
 
     CodecType codec = codec_it->second;
     std::shared_ptr<RtspFrameQueue> queue = queue_it->second;
@@ -253,9 +284,83 @@ void RtspServer::process_frame_nals(const StreamFrame& frame) {
         }
     }
 
+    size_t nal_count = access_unit_nals.size();
     if (queue->has_active_sources() && !access_unit_nals.empty()) {
         queue->push_access_unit(std::move(access_unit_nals));
     }
+    return nal_count;
+}
+
+void RtspServer::log_main_stream_stats(const StreamFrame& frame,
+                                       size_t nal_count,
+                                       uint64_t process_cost_us) {
+    using namespace std::chrono;
+
+    steady_clock::time_point now = steady_clock::now();
+    size_t frame_size = frame.frame_size();
+    NaluType frame_type = frame.frame_type();
+    ++main_interval_frames_;
+    main_interval_bytes_ += frame_size;
+    main_interval_process_cost_us_ += process_cost_us;
+    if (frame_type == NaluType::IDR_SLICE) {
+        ++main_total_idr_frames_;
+    }
+
+    if (frame_type == NaluType::IDR_SLICE ||
+        duration_cast<seconds>(now - main_debug_log_time_).count() >= 1) {
+        LOGGER_DEBUG(RTSP,
+            "RTSP main frame: frame_id=%llu frame_type=%s frame_size=%zu "
+            "venc_pack_count=%u rtsp_nal_count=%zu rtsp_process_cost_us=%llu",
+            static_cast<unsigned long long>(frame.frame_id()),
+            frame_type_name(frame_type), frame_size, frame.data().pack_count,
+            nal_count, static_cast<unsigned long long>(process_cost_us));
+        main_debug_log_time_ = now;
+    }
+
+    milliseconds elapsed = duration_cast<milliseconds>(now - main_stats_start_);
+    if (elapsed.count() < 5000) return;
+
+    std::map<StreamType, std::shared_ptr<RtspFrameQueue>>::iterator queue_it =
+        frame_queues_.find(StreamType::VIDEO_MAIN);
+    if (queue_it == frame_queues_.end()) return;
+    RtspQueueStats queue_stats = queue_it->second->stats();
+
+    ConsumerStats consumer_stats = {};
+    bool has_consumer_stats = main_consumer_stats_provider_ &&
+        main_consumer_stats_provider_(consumer_stats);
+    double seconds_elapsed = elapsed.count() / 1000.0;
+    double fps = main_interval_frames_ / seconds_elapsed;
+    double bitrate_kbps = main_interval_bytes_ * 8.0 / seconds_elapsed / 1000.0;
+    double avg_process_cost_us = main_interval_frames_ == 0 ? 0.0 :
+        static_cast<double>(main_interval_process_cost_us_) / main_interval_frames_;
+
+    LOGGER_INFO(RTSP,
+        "RTSP main stats: frames=%llu fps=%.1f bitrate_kbps=%.1f "
+        "last_frame_id=%llu last_frame_type=%s last_frame_size=%zu "
+        "idr_total=%llu avg_process_cost_us=%.1f "
+        "consumer_queue_depth=%zu/%zu consumer_queue_peak=%zu consumer_drop_total=%llu "
+        "rtsp_queue_depth=%zu/%zu rtsp_queue_peak=%zu rtsp_drop_total=%llu rtsp_skip_total=%llu "
+        "active_sources=%zu",
+        static_cast<unsigned long long>(main_interval_frames_), fps, bitrate_kbps,
+        static_cast<unsigned long long>(frame.frame_id()),
+        frame_type_name(frame_type), frame_size,
+        static_cast<unsigned long long>(main_total_idr_frames_),
+        avg_process_cost_us,
+        has_consumer_stats ? consumer_stats.queue_depth : 0,
+        has_consumer_stats ? consumer_stats.max_queue_size : 0,
+        has_consumer_stats ? consumer_stats.peak_queue_depth : 0,
+        static_cast<unsigned long long>(
+            has_consumer_stats ? consumer_stats.dropped : 0),
+        queue_stats.queue_depth, queue_stats.max_queue_size,
+        queue_stats.peak_queue_depth,
+        static_cast<unsigned long long>(queue_stats.dropped),
+        static_cast<unsigned long long>(queue_stats.skipped),
+        queue_stats.active_sources);
+
+    main_stats_start_ = now;
+    main_interval_frames_ = 0;
+    main_interval_bytes_ = 0;
+    main_interval_process_cost_us_ = 0;
 }
 
 void RtspServer::on_frame_trigger(void* clientData) {

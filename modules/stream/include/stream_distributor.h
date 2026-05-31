@@ -16,6 +16,7 @@ struct ConsumerSlot {
     uint32_t consumer_id;
     std::deque<StreamFramePtr> queue;
     size_t max_queue_size;
+    size_t peak_queue_depth{0};
     std::mutex mutex;
     std::condition_variable cv;
     std::thread worker;
@@ -24,6 +25,14 @@ struct ConsumerSlot {
     std::atomic<bool> running{true};
     std::atomic<uint64_t> dropped{0};
     std::atomic<uint64_t> consumed{0};
+};
+
+struct ConsumerStats {
+    size_t queue_depth;
+    size_t max_queue_size;
+    size_t peak_queue_depth;
+    uint64_t dropped;
+    uint64_t consumed;
 };
 
 class StreamDistributor {
@@ -35,6 +44,7 @@ public:
 
     uint32_t add_consumer(ConsumerCallback cb, ConsumerConfig config);
     void remove_consumer(uint32_t id);
+    bool get_consumer_stats(uint32_t id, ConsumerStats& stats);
 
     void push(StreamFramePtr frame);
 

@@ -122,9 +122,16 @@ static void test_queue_notifies_overflow_even_when_new_frame_is_not_idr() {
     RtspNalUnit nal;
     assert(!queue.pop_nal_unit(nal));
     assert(overflow_count == 1);
+
+    RtspQueueStats stats = queue.stats();
+    assert(stats.queue_depth == 0);
+    assert(stats.max_queue_size == 1);
+    assert(stats.peak_queue_depth == 1);
+    assert(stats.dropped == 1);
+    assert(stats.skipped == 1);
 }
 
-static void test_stream_frame_timestamp_is_non_zero_and_monotonic() {
+static void test_stream_frame_metadata() {
     uint8_t data[] = {0x65, 0x88};
     FrameData frame_data = {};
     frame_data.pack_count = 1;
@@ -139,6 +146,9 @@ static void test_stream_frame_timestamp_is_non_zero_and_monotonic() {
 
     assert(first.timestamp() > 0);
     assert(second.timestamp() > first.timestamp());
+    assert(second.frame_id() == first.frame_id() + 1);
+    assert(first.frame_type() == NaluType::IDR_SLICE);
+    assert(first.frame_size() == sizeof(data));
 }
 
 int main() {
@@ -147,6 +157,6 @@ int main() {
     test_queue_discards_stale_p_frames_when_new_idr_overflows();
     test_queue_does_not_request_idr_when_overflow_frame_is_idr();
     test_queue_notifies_overflow_even_when_new_frame_is_not_idr();
-    test_stream_frame_timestamp_is_non_zero_and_monotonic();
+    test_stream_frame_metadata();
     return 0;
 }

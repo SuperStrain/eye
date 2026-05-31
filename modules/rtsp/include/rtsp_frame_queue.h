@@ -20,6 +20,15 @@ struct RtspAccessUnit {
     std::deque<RtspNalUnit> nals;
 };
 
+struct RtspQueueStats {
+    size_t queue_depth;
+    size_t max_queue_size;
+    size_t peak_queue_depth;
+    size_t active_sources;
+    uint64_t dropped;
+    uint64_t skipped;
+};
+
 class RtspFrameQueue {
 public:
     explicit RtspFrameQueue(size_t max_queue_size);
@@ -33,6 +42,7 @@ public:
     void notify_active_sources();
     void clear();
     bool has_active_sources() const;
+    RtspQueueStats stats() const;
     void set_overflow_callback(std::function<void()> callback);
 
 private:
@@ -42,7 +52,10 @@ private:
     std::vector<RtspStreamSource*> active_sources_;
     mutable std::mutex mutex_;
     size_t max_queue_size_;
+    size_t peak_queue_depth_;
     bool waiting_for_idr_after_drop_;
+    uint64_t dropped_;
+    uint64_t skipped_;
     std::function<void()> overflow_callback_;
     mutable std::chrono::steady_clock::time_point last_overflow_log_time_;
 };

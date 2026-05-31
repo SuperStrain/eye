@@ -50,7 +50,13 @@ int main() {
         auto rtsp_cb = [](const StreamFrame& frame) {
             RtspServer::instance().on_frame(frame);
         };
-        scm.register_consumer(StreamType::VIDEO_MAIN, rtsp_cb, rtsp_config);
+        uint32_t main_rtsp_consumer =
+            scm.register_consumer(StreamType::VIDEO_MAIN, rtsp_cb, rtsp_config);
+        rtsp.set_main_consumer_stats_provider(
+            [&scm, main_rtsp_consumer](ConsumerStats& stats) {
+                return scm.get_distributor(StreamType::VIDEO_MAIN)
+                    .get_consumer_stats(main_rtsp_consumer, stats);
+            });
         scm.register_consumer(StreamType::VIDEO_SUB, rtsp_cb, rtsp_config);
     } else {
         LOGGER_ERROR(RTSP, "Failed to start RTSP server, streaming disabled");

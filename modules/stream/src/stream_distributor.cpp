@@ -64,6 +64,27 @@ void StreamDistributor::remove_consumer(uint32_t id) {
     }
 }
 
+bool StreamDistributor::get_consumer_stats(uint32_t id, ConsumerStats& stats) {
+    std::shared_ptr<ConsumerSlot> target;
+    {
+        std::lock_guard<std::mutex> lock(slots_mutex_);
+        auto it = std::find_if(slots_.begin(), slots_.end(),
+            [id](const std::shared_ptr<ConsumerSlot>& s) { return s->consumer_id == id; });
+        if (it == slots_.end()) return false;
+        target = *it;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(target->mutex);
+        stats.queue_depth = target->queue.size();
+        stats.max_queue_size = target->max_queue_size;
+        stats.peak_queue_depth = target->peak_queue_depth;
+    }
+    stats.dropped = target->dropped.load(std::memory_order_relaxed);
+    stats.consumed = target->consumed.load(std::memory_order_relaxed);
+    return true;
+}
+
 void StreamDistributor::push(StreamFramePtr frame) {
     std::vector<std::shared_ptr<ConsumerSlot>> snapshot;
     {
@@ -81,6 +102,8 @@ void StreamDistributor::push(StreamFramePtr frame) {
                 slot->dropped++;
             }
             slot->queue.push_back(frame);
+            slot->peak_queue_depth =
+                std::max(slot->peak_queue_depth, slot->queue.size());
         }
         slot->cv.notify_one();
     }

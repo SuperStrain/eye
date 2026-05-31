@@ -1,6 +1,7 @@
 #include "rtsp_frame_queue.h"
 #include "rtsp_stream_source.h"
 #include "logger.h"
+#include <algorithm>
 
 static bool access_unit_has_idr(const std::deque<RtspNalUnit>& nals) {
     for (const RtspNalUnit& nal : nals) {
@@ -11,7 +12,10 @@ static bool access_unit_has_idr(const std::deque<RtspNalUnit>& nals) {
 
 RtspFrameQueue::RtspFrameQueue(size_t max_queue_size)
     : max_queue_size_(max_queue_size),
-      waiting_for_idr_after_drop_(false) {
+      peak_queue_depth_(0),
+      waiting_for_idr_after_drop_(false),
+      dropped_(0),
+      skipped_(0) {
     if (max_queue_size_ == 0) {
         max_queue_size_ = 1;
     }
@@ -42,6 +46,7 @@ void RtspFrameQueue::push_access_unit(std::deque<RtspNalUnit> nals) {
 
         if (waiting_for_idr_after_drop_) {
             if (!has_idr) {
+                ++skipped_;
                 nals.clear();
             } else {
                 waiting_for_idr_after_drop_ = false;
@@ -52,6 +57,7 @@ void RtspFrameQueue::push_access_unit(std::deque<RtspNalUnit> nals) {
             RtspAccessUnit access_unit;
             access_unit.nals = std::move(nals);
             queue_.push_back(std::move(access_unit));
+            peak_queue_depth_ = std::max(peak_queue_depth_, queue_.size());
         }
     }
 
@@ -80,6 +86,7 @@ bool RtspFrameQueue::pop_nal_unit(RtspNalUnit& nal) {
 
 void RtspFrameQueue::drop_oldest_access_unit_locked() {
     bool dropped_idr = access_unit_has_idr(queue_.front().nals);
+    dropped_ += queue_.size();
     queue_.clear();
     waiting_for_idr_after_drop_ = true;
 
@@ -129,6 +136,18 @@ void RtspFrameQueue::clear() {
 bool RtspFrameQueue::has_active_sources() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return !active_sources_.empty();
+}
+
+RtspQueueStats RtspFrameQueue::stats() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    RtspQueueStats result;
+    result.queue_depth = queue_.size();
+    result.max_queue_size = max_queue_size_;
+    result.peak_queue_depth = peak_queue_depth_;
+    result.active_sources = active_sources_.size();
+    result.dropped = dropped_;
+    result.skipped = skipped_;
+    return result;
 }
 
 void RtspFrameQueue::set_overflow_callback(std::function<void()> callback) {

@@ -1,8 +1,11 @@
 #include "stream_frame.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <mutex>
+
+static std::atomic<uint64_t> next_frame_ids[3];
 
 static uint64_t next_monotonic_timestamp_ms() {
     using namespace std::chrono;
@@ -25,6 +28,8 @@ static uint64_t next_monotonic_timestamp_ms() {
 StreamFrame::StreamFrame(VencChannel chn, StreamType type, CodecType codec, const FrameData& data)
     : channel_(chn), type_(type), codec_type_(codec), frame_data_(data) {
     timestamp_ = next_monotonic_timestamp_ms();
+    frame_id_ = next_frame_ids[static_cast<int>(channel_)].fetch_add(
+        1, std::memory_order_relaxed) + 1;
 
     // 深拷贝 pack 数据，避免上游释放 buffer 后产生悬空指针
     if (frame_data_.pack_count > 0) {
@@ -45,14 +50,32 @@ StreamFrame::StreamFrame(VencChannel chn, StreamType type, CodecType codec, cons
 StreamFrame::~StreamFrame() {
 }
 
+NaluType StreamFrame::frame_type() const {
+    uint32_t count = std::min(frame_data_.pack_count, FrameData::MAX_PACKS);
+    NaluType result = NaluType::OTHER;
+    for (uint32_t i = 0; i < count; ++i) {
+        NaluType type = frame_data_.packs[i].nalu_type;
+        if (type == NaluType::IDR_SLICE) return type;
+        if (type == NaluType::B_SLICE) result = type;
+        if (type == NaluType::P_SLICE && result == NaluType::OTHER) result = type;
+    }
+    return result;
+}
+
+size_t StreamFrame::frame_size() const {
+    size_t size = 0;
+    uint32_t count = std::min(frame_data_.pack_count, FrameData::MAX_PACKS);
+    for (uint32_t i = 0; i < count; ++i) {
+        size += frame_data_.packs[i].len;
+    }
+    return size;
+}
+
 bool StreamFrame::is_idr() const {
     if (codec_type_ == CodecType::MJPEG) {
         return true;
     }
-    uint32_t count = frame_data_.pack_count;
-    if (count > FrameData::MAX_PACKS) {
-        count = FrameData::MAX_PACKS;
-    }
+    uint32_t count = std::min(frame_data_.pack_count, FrameData::MAX_PACKS);
     for (uint32_t i = 0; i < count; ++i) {
         if (frame_data_.packs[i].nalu_type == NaluType::IDR_SLICE) {
             return true;
