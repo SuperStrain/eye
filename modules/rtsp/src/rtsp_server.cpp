@@ -1,6 +1,7 @@
 #include "rtsp_server.h"
 #include "rtsp_server_media_subsession.h"
 #include "rtsp_nal_parser.h"
+#include "rtsp_monotonic_clock.h"
 #include "rtsp_stream_source.h"
 #include "logger.h"
 #include "stream_distributor.h"
@@ -9,7 +10,6 @@
 #include <BasicUsageEnvironment.hh>
 #include <MediaSink.hh>
 #include <RTSPServer.hh>
-#include <chrono>
 
 static const char* frame_type_name(NaluType type) {
     switch (type) {
@@ -32,8 +32,8 @@ RtspServer::RtspServer()
       running_(false),
       watch_variable_(0),
       frame_event_trigger_(0),
-      main_stats_start_(std::chrono::steady_clock::now()),
-      main_debug_log_time_(main_stats_start_),
+      main_stats_start_ms_(rtsp_monotonic_now_ms()),
+      main_debug_log_time_ms_(main_stats_start_ms_),
       main_interval_frames_(0),
       main_interval_bytes_(0),
       main_interval_process_cost_us_(0),
@@ -222,12 +222,10 @@ void RtspServer::set_main_consumer_stats_provider(
 void RtspServer::on_frame(const StreamFrame& frame) {
     if (!running_.load()) return;
 
-    std::chrono::steady_clock::time_point start =
-        std::chrono::steady_clock::now();
+    uint64_t start_us = rtsp_monotonic_now_us();
     size_t nal_count = process_frame_nals(frame);
-    uint64_t process_cost_us = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::steady_clock::now() - start).count());
+    uint64_t process_cost_us = rtsp_monotonic_elapsed_us(
+        start_us, rtsp_monotonic_now_us());
 
     if (frame.type() == StreamType::VIDEO_MAIN) {
         log_main_stream_stats(frame, nal_count, process_cost_us);
@@ -294,9 +292,7 @@ size_t RtspServer::process_frame_nals(const StreamFrame& frame) {
 void RtspServer::log_main_stream_stats(const StreamFrame& frame,
                                        size_t nal_count,
                                        uint64_t process_cost_us) {
-    using namespace std::chrono;
-
-    steady_clock::time_point now = steady_clock::now();
+    uint64_t now_ms = rtsp_monotonic_now_ms();
     size_t frame_size = frame.frame_size();
     NaluType frame_type = frame.frame_type();
     ++main_interval_frames_;
@@ -307,18 +303,18 @@ void RtspServer::log_main_stream_stats(const StreamFrame& frame,
     }
 
     if (frame_type == NaluType::IDR_SLICE ||
-        duration_cast<seconds>(now - main_debug_log_time_).count() >= 1) {
+        rtsp_monotonic_elapsed_ms(main_debug_log_time_ms_, now_ms) >= 1000) {
         LOGGER_DEBUG(RTSP,
             "RTSP main frame: frame_id=%llu frame_type=%s frame_size=%zu "
             "venc_pack_count=%u rtsp_nal_count=%zu rtsp_process_cost_us=%llu",
             static_cast<unsigned long long>(frame.frame_id()),
             frame_type_name(frame_type), frame_size, frame.data().pack_count,
             nal_count, static_cast<unsigned long long>(process_cost_us));
-        main_debug_log_time_ = now;
+        main_debug_log_time_ms_ = now_ms;
     }
 
-    milliseconds elapsed = duration_cast<milliseconds>(now - main_stats_start_);
-    if (elapsed.count() < 5000) return;
+    int64_t elapsed_ms = rtsp_monotonic_elapsed_ms(main_stats_start_ms_, now_ms);
+    if (elapsed_ms < 5000) return;
 
     std::map<StreamType, std::shared_ptr<RtspFrameQueue>>::iterator queue_it =
         frame_queues_.find(StreamType::VIDEO_MAIN);
@@ -328,7 +324,7 @@ void RtspServer::log_main_stream_stats(const StreamFrame& frame,
     ConsumerStats consumer_stats = {};
     bool has_consumer_stats = main_consumer_stats_provider_ &&
         main_consumer_stats_provider_(consumer_stats);
-    double seconds_elapsed = elapsed.count() / 1000.0;
+    double seconds_elapsed = elapsed_ms / 1000.0;
     double fps = main_interval_frames_ / seconds_elapsed;
     double bitrate_kbps = main_interval_bytes_ * 8.0 / seconds_elapsed / 1000.0;
     double avg_process_cost_us = main_interval_frames_ == 0 ? 0.0 :
@@ -357,7 +353,7 @@ void RtspServer::log_main_stream_stats(const StreamFrame& frame,
         static_cast<unsigned long long>(queue_stats.skipped),
         queue_stats.active_sources);
 
-    main_stats_start_ = now;
+    main_stats_start_ms_ = now_ms;
     main_interval_frames_ = 0;
     main_interval_bytes_ = 0;
     main_interval_process_cost_us_ = 0;

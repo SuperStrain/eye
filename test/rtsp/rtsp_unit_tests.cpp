@@ -1,4 +1,5 @@
 #include "rtsp_frame_queue.h"
+#include "rtsp_monotonic_clock.h"
 #include "stream_frame.h"
 
 #include <cassert>
@@ -151,6 +152,14 @@ static void test_stream_frame_metadata() {
     assert(first.frame_size() == sizeof(data));
 }
 
+static void test_monotonic_clock_elapsed_never_goes_negative() {
+    uint64_t start = rtsp_monotonic_now_ms();
+    uint64_t now = rtsp_monotonic_now_ms();
+
+    assert(rtsp_monotonic_elapsed_ms(start, now) >= 0);
+    assert(rtsp_monotonic_elapsed_ms(now, start) == 0);
+}
+
 int main() {
     test_queue_drops_whole_access_units();
     test_queue_skips_non_idr_after_overflow_until_next_idr();
@@ -158,5 +167,6 @@ int main() {
     test_queue_does_not_request_idr_when_overflow_frame_is_idr();
     test_queue_notifies_overflow_even_when_new_frame_is_not_idr();
     test_stream_frame_metadata();
+    test_monotonic_clock_elapsed_never_goes_negative();
     return 0;
 }

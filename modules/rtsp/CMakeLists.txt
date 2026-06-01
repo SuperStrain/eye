@@ -2,6 +2,7 @@ set(LIVE555_ROOT ${THIRDPARTY}/live555)
 
 add_library(rtsp STATIC
     src/rtsp_frame_queue.cpp
+    src/rtsp_monotonic_clock.cpp
     src/rtsp_nal_parser.cpp
     src/rtsp_parameter_set_cache.cpp
     src/rtsp_stream_source.cpp

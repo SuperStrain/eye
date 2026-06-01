@@ -7,7 +7,6 @@
 #include <memory>
 #include <string>
 #include <atomic>
-#include <chrono>
 #include <thread>
 #include <UsageEnvironment.hh>
 #include "common_types.h"
@@ -71,8 +70,8 @@ private:
     EventTriggerId frame_event_trigger_;
     std::function<bool(ConsumerStats&)> main_consumer_stats_provider_;
 
-    std::chrono::steady_clock::time_point main_stats_start_;
-    std::chrono::steady_clock::time_point main_debug_log_time_;
+    uint64_t main_stats_start_ms_;
+    uint64_t main_debug_log_time_ms_;
     uint64_t main_interval_frames_;
     uint64_t main_interval_bytes_;
     uint64_t main_interval_process_cost_us_;
