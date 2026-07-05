@@ -1,4 +1,5 @@
 #include "rtsp_nal_parser.h"
+#include <cstddef>
 
 H264NalType parse_h264_nal_type(const uint8_t* data, uint32_t len) {
     if (len < 1) return H264NalType::OTHER;

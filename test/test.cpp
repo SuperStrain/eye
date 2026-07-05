@@ -1,6 +1,7 @@
 #include "test.h"
 #include "stream_test.h"
 #include "global_constants.h"
+#ifdef PLATFORM_HI3516CV610
 #include <ss_mpi_vpss.h>
 #include "logger.h"
 #include <pthread.h>
@@ -11,7 +12,9 @@
 
 ot_vpss_grp g_vpssGrp = 0;
 ot_vpss_chn g_vpssChn = hiMppMedia::videoProcessHi::vpssChn2;
+#endif
 
+#ifdef PLATFORM_HI3516CV610
 static td_s32 SAMPLE_COMM_VPSS_EnableChn_Md(ot_vpss_grp VpssGrp, ot_vpss_chn VpssChn, 
                                                   ot_vpss_chn_attr *pstVpssChnAttr,
                                                   ot_vpss_ext_chn_attr *pstVpssExtChnAttr)
@@ -172,6 +175,8 @@ static int yuv_frame_test()
 
     return 0;
 }
+
+#endif
 
 int test_main()
 {

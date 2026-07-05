@@ -53,7 +53,11 @@ private:
     TaskScheduler* scheduler_;
     std::thread event_thread_;
     std::atomic<bool> running_;
+#ifdef RTSP_USE_SYSROOT_LIVE555
+    char volatile watch_variable_;
+#else
     EventLoopWatchVariable watch_variable_;
+#endif
 
     std::map<StreamType, ServerMediaSession*> sessions_;
     std::map<StreamType, std::shared_ptr<RtspFrameQueue>> frame_queues_;

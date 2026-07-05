@@ -37,34 +37,36 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(NOT DEFINED TARGET_PLATFORM)
+    set(TARGET_PLATFORM "hi3516cv610")
+endif()
+
 set(THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
 set(target_out ${PROJECT_NAME})
-set(HI_MPP_LIB
-    ss_mpi_sysmem
-    ss_mpi
-    ir_auto
-    dehaze
-    acs
-    drc
-    ldci
-    bnr
-    calcflicker
-    extend_stats
-    ot_mpi_isp
-    ss_mpi_isp
-    ss_mpi_ae
-    ss_mpi_awb
-    ss_mpi_sysbind
-    sns_sc4336p
+if(TARGET_PLATFORM STREQUAL "hi3516cv610")
+    set(HI_MPP_LIB
+        ss_mpi_sysmem
+        ss_mpi
+        ir_auto
+        dehaze
+        acs
+        drc
+        ldci
+        bnr
+        calcflicker
+        extend_stats
+        ot_mpi_isp
+        ss_mpi_isp
+        ss_mpi_ae
+        ss_mpi_awb
+        ss_mpi_sysbind
+        sns_sc4336p
     )
+endif()
 set(THIRDPARTY_LIB
     securec
     ${HI_MPP_LIB}
     )
-
-if(NOT DEFINED TARGET_PLATFORM)
-    set(TARGET_PLATFORM "hi3516cv610")
-endif()
 
 add_subdirectory(modules/core)
 add_subdirectory(modules/interface)
@@ -86,14 +88,29 @@ endif()
 install(CODE [[message(STATUS "准备清理安装目录：${CMAKE_INSTALL_PREFIX}")]])
 file(REMOVE_RECURSE "${CMAKE_INSTALL_PREFIX}")
 
-file(GLOB_RECURSE THIRD_PARTY_SOS "${CMAKE_SOURCE_DIR}/thirdparty/*.so*")
-set(FILTERED_SOS "")
-foreach(lib ${THIRD_PARTY_SOS})
-    if(NOT lib MATCHES ".*/hi3516cv610_mpp/.*")
-        list(APPEND FILTERED_SOS ${lib})
-    endif()
-endforeach()
-install(FILES ${FILTERED_SOS} DESTINATION lib)
+if(TARGET_PLATFORM STREQUAL "rv1126b")
+    set(RV1126B_SYSROOT_SOS "")
+    foreach(lib zlog liveMedia groupsock BasicUsageEnvironment UsageEnvironment)
+        file(GLOB RV1126B_SO_${lib} "${CMAKE_SYSROOT}/usr/lib/lib${lib}.so*")
+        list(LENGTH RV1126B_SO_${lib} count_${lib})
+        if(count_${lib} EQUAL 0)
+            message(FATAL_ERROR "RV1126B: ${CMAKE_SYSROOT}/usr/lib/lib${lib}.so* not found in sysroot")
+        endif()
+        list(APPEND RV1126B_SYSROOT_SOS ${RV1126B_SO_${lib}})
+    endforeach()
+    set(FILTERED_SOS "")
+    list(APPEND FILTERED_SOS ${RV1126B_SYSROOT_SOS})
+    install(FILES ${FILTERED_SOS} DESTINATION lib)
+else()
+    file(GLOB_RECURSE THIRD_PARTY_SOS "${CMAKE_SOURCE_DIR}/thirdparty/*.so*")
+    set(FILTERED_SOS "")
+    foreach(lib ${THIRD_PARTY_SOS})
+        if(NOT lib MATCHES ".*/hi3516cv610_mpp/.*" AND NOT lib MATCHES ".*/rv1126b_mpp/.*")
+            list(APPEND FILTERED_SOS ${lib})
+        endif()
+    endforeach()
+    install(FILES ${FILTERED_SOS} DESTINATION lib)
+endif()
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/conf/ DESTINATION conf)
 

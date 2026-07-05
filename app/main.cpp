@@ -2,9 +2,8 @@
 #include <csignal>
 #include <unistd.h>
 #include "logger.h"
-#include "hi_video_pipeline.h"
+#include "platform_factory.h"
 #include "stream_consumer_manager.h"
-#include "hi_stream_fetcher.h"
 #include "rtsp_server.h"
 #include "test.h"
 
@@ -19,21 +18,21 @@ int main() {
 
     loggerSpace::Logger::instance().init();
 
-    hiMppMedia::videoProcessHi::getInstance().init();
+    platform_video_pipeline().init();
 
     auto& scm = StreamConsumerManager::instance();
     scm.set_fetcher(StreamType::VIDEO_MAIN,
-        std::unique_ptr<StreamFetcher>(new StreamFetcher(
+        create_stream_fetcher(
             VencChannel::CHN0, StreamType::VIDEO_MAIN, CodecType::H265,
-            scm.get_distributor(StreamType::VIDEO_MAIN))));
+            scm.get_distributor(StreamType::VIDEO_MAIN)));
     scm.set_fetcher(StreamType::VIDEO_SUB,
-        std::unique_ptr<StreamFetcher>(new StreamFetcher(
+        create_stream_fetcher(
             VencChannel::CHN1, StreamType::VIDEO_SUB, CodecType::H264,
-            scm.get_distributor(StreamType::VIDEO_SUB))));
+            scm.get_distributor(StreamType::VIDEO_SUB)));
     scm.set_fetcher(StreamType::VIDEO_MJPEG,
-        std::unique_ptr<StreamFetcher>(new StreamFetcher(
+        create_stream_fetcher(
             VencChannel::CHN2, StreamType::VIDEO_MJPEG, CodecType::MJPEG,
-            scm.get_distributor(StreamType::VIDEO_MJPEG))));
+            scm.get_distributor(StreamType::VIDEO_MJPEG)));
 
     auto& rtsp = RtspServer::instance();
     if (rtsp.start(8554)) {
