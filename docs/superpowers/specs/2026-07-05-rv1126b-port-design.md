@@ -159,6 +159,7 @@ For RV1126B SDK packaging:
 
 - select `07_atk_dlrv1126b_automipi_eye_defconfig` in the SDK
 - build and install `eye` into `$HOME/eyeOut`
+- keep RV1126B runtime libraries in the SDK rootfs instead of installing copies into `$HOME/eyeOut/lib`
 - run the SDK packaging path that creates `app.img` from `eyeout`
 
 The runtime path remains compatible with current assumptions:
