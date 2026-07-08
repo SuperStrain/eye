@@ -4,7 +4,7 @@
 
 - 这是嵌入式视频采集/编码程序，通过 `TARGET_PLATFORM` 支持双平台：海思 Hi3516CV610（ARM Cortex-A7 32 位）与瑞芯微 RV1126B（aarch64）；不要尝试本地运行生成物，二进制运行在 ARM 目标设备上。
 - Hi3516CV610 工具链前缀 `arm-v01c02-linux-musleabi-`，配置在 `cmake/toolchain-arm-v01c02.cmake`，CPU flags：`-mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4`。
-- RV1126B 工具链前缀 `aarch64-buildroot-linux-gnu-`，配置在 `cmake/toolchain-rv1126b.cmake`，SDK root `/opt/aarch64-buildroot-linux-gnu_sdk-buildroot`，sysroot 设为 `${RV1126B_SDK_ROOT}/aarch64-buildroot-linux-gnu/sysroot`；未设专用 CPU flags（通用 aarch64）。
+- RV1126B 工具链前缀 `aarch64-buildroot-linux-gnu-`，配置在 `cmake/toolchain-rv1126b.cmake`；该文件不硬编码任何绝对路径——编译器只用前缀（依赖 PATH 查找工具链 bin），`CMAKE_SYSROOT` 通过 `gcc --print-sysroot` 自动探测（可用 `-DCMAKE_SYSROOT=...` 手动覆盖）；未设专用 CPU flags（通用 aarch64）。构建前提是 PATH 已包含工具链 bin 目录。
 - CMake 必须显式带 toolchain；根 `CMakeLists.txt` 未设置 `CMAKE_TOOLCHAIN_FILE` 会直接 `FATAL_ERROR`。
 - 标准构建顺序：`cd build && ./set.sh && make && cmake --install .`。
 - `build/set.sh [hi3516cv610|rv1126b]` 按平台选择对应 toolchain（默认 `hi3516cv610`），会先执行 `build/clean.sh` 清掉 `build/` 内除 `.sh` 外的文件，再用 Release 配置 CMake。
@@ -37,5 +37,5 @@
 
 ## 第三方与安装
 
-- Hi3516CV610 的 MPP 头/库来自 `thirdparty/hi3516cv610_mpp/`，zlog 来自 `thirdparty/zlog/`；RV1126B 的 `librockit` 等运行时库来自交叉编译 sysroot（`toolchain-rv1126b.cmake` 设的 `CMAKE_SYSROOT`），不在仓库 `thirdparty` 内。
+- Hi3516CV610 的 MPP 头/库来自 `thirdparty/hi3516cv610_mpp/`，zlog 来自 `thirdparty/zlog/`；RV1126B 的 `librockit` 等运行时库来自交叉编译 sysroot（`toolchain-rv1126b.cmake` 自动探测的 `CMAKE_SYSROOT`），不在仓库 `thirdparty` 内。
 - Hi3516CV610 构建时安装阶段会复制 `thirdparty` 下除 `hi3516cv610_mpp`/`rv1126b_mpp` 目录外的 `.so*` 到 `lib/`；RV1126B 构建时 `.so` 列表置空，运行时库由 SDK rootfs 提供，安装不复制。MPP `.so` 不会被安装规则复制。
