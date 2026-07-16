@@ -57,7 +57,7 @@ int RvVideoPipeline::init() {
     if (ret != 0) goto fail_bind;
 
     initialized_ = true;
-    LOGGER_INFO(HIMPP, "RV1126B video pipeline initialized");
+    LOGGER_INFO(ROCKIT, "RV1126B video pipeline initialized");
     return 0;
 
 fail_bind:
@@ -94,7 +94,7 @@ int RvVideoPipeline::stopChannel(int) { return 0; }
 int RvVideoPipeline::init_sys() {
     int ret = RK_MPI_SYS_Init();
     if (ret != RK_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "RK_MPI_SYS_Init failed: %#x", ret);
+        LOGGER_ERROR(ROCKIT, "RK_MPI_SYS_Init failed: %#x", ret);
         return ret;
     }
     return 0;
@@ -110,11 +110,11 @@ int RvVideoPipeline::init_vi_dev() {
     if (ret == RK_ERR_VI_NOT_CONFIG) {
         ret = RK_MPI_VI_SetDevAttr(kDevId, &dev_attr);
         if (ret != RK_SUCCESS) {
-            LOGGER_ERROR(HIMPP, "RK_MPI_VI_SetDevAttr failed: %#x", ret);
+            LOGGER_ERROR(ROCKIT, "RK_MPI_VI_SetDevAttr failed: %#x", ret);
             return ret;
         }
     } else if (ret != RK_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "RK_MPI_VI_GetDevAttr failed: %#x", ret);
+        LOGGER_ERROR(ROCKIT, "RK_MPI_VI_GetDevAttr failed: %#x", ret);
         return ret;
     }
 
@@ -122,14 +122,14 @@ int RvVideoPipeline::init_vi_dev() {
     if (ret != RK_SUCCESS) {
         ret = RK_MPI_VI_EnableDev(kDevId);
         if (ret != RK_SUCCESS) {
-            LOGGER_ERROR(HIMPP, "RK_MPI_VI_EnableDev failed: %#x", ret);
+            LOGGER_ERROR(ROCKIT, "RK_MPI_VI_EnableDev failed: %#x", ret);
             return ret;
         }
         bind_pipe.u32Num = 1;
         bind_pipe.PipeId[0] = kPipeId;
         ret = RK_MPI_VI_SetDevBindPipe(kDevId, &bind_pipe);
         if (ret != RK_SUCCESS) {
-            LOGGER_ERROR(HIMPP, "RK_MPI_VI_SetDevBindPipe failed: %#x", ret);
+            LOGGER_ERROR(ROCKIT, "RK_MPI_VI_SetDevBindPipe failed: %#x", ret);
             return ret;
         }
     }
@@ -157,12 +157,12 @@ static int set_vi_channel(int chn, int width, int height, int max_width, int max
 int RvVideoPipeline::init_vi_channels() {
     int ret = set_vi_channel(kViMainChn, kMainWidth, kMainHeight, kMainWidth, kMainHeight);
     if (ret != RK_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "main VI channel init failed: %#x", ret);
+        LOGGER_ERROR(ROCKIT, "main VI channel init failed: %#x", ret);
         return ret;
     }
     ret = set_vi_channel(kViSubChn, kSubWidth, kSubHeight, kSubWidth, kSubHeight);
     if (ret != RK_SUCCESS) {
-        LOGGER_ERROR(HIMPP, "sub VI channel init failed: %#x", ret);
+        LOGGER_ERROR(ROCKIT, "sub VI channel init failed: %#x", ret);
         return ret;
     }
     return 0;
@@ -281,17 +281,17 @@ int RvVideoPipeline::unbind_channels() {
     int ret, first_err = RK_SUCCESS;
     ret = unbind_vi_from_venc(kViMainChn, kVencMainChn);
     if (ret != RK_SUCCESS) {
-        LOGGER_WARN(HIMPP, "RK_MPI_SYS_UnBind(main) failed: %#x", ret);
+        LOGGER_WARN(ROCKIT, "RK_MPI_SYS_UnBind(main) failed: %#x", ret);
         if (first_err == RK_SUCCESS) first_err = ret;
     }
     ret = unbind_vi_from_venc(kViSubChn, kVencSubChn);
     if (ret != RK_SUCCESS) {
-        LOGGER_WARN(HIMPP, "RK_MPI_SYS_UnBind(sub) failed: %#x", ret);
+        LOGGER_WARN(ROCKIT, "RK_MPI_SYS_UnBind(sub) failed: %#x", ret);
         if (first_err == RK_SUCCESS) first_err = ret;
     }
     ret = unbind_vi_from_venc(kViSubChn, kVencMjpegChn);
     if (ret != RK_SUCCESS) {
-        LOGGER_WARN(HIMPP, "RK_MPI_SYS_UnBind(mjpeg) failed: %#x", ret);
+        LOGGER_WARN(ROCKIT, "RK_MPI_SYS_UnBind(mjpeg) failed: %#x", ret);
         if (first_err == RK_SUCCESS) first_err = ret;
     }
     return first_err;
@@ -301,29 +301,29 @@ int RvVideoPipeline::deinit_venc_channels() {
     int ret;
     if (venc_created_[kVencMainChn]) {
         ret = RK_MPI_VENC_StopRecvFrame(kVencMainChn);
-        if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VENC_StopRecvFrame(main) failed: %#x", ret);
+        if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VENC_StopRecvFrame(main) failed: %#x", ret);
     }
     if (venc_created_[kVencSubChn]) {
         ret = RK_MPI_VENC_StopRecvFrame(kVencSubChn);
-        if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VENC_StopRecvFrame(sub) failed: %#x", ret);
+        if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VENC_StopRecvFrame(sub) failed: %#x", ret);
     }
     if (venc_created_[kVencMjpegChn]) {
         ret = RK_MPI_VENC_StopRecvFrame(kVencMjpegChn);
-        if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VENC_StopRecvFrame(mjpeg) failed: %#x", ret);
+        if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VENC_StopRecvFrame(mjpeg) failed: %#x", ret);
     }
     if (venc_created_[kVencMainChn]) {
         ret = RK_MPI_VENC_DestroyChn(kVencMainChn);
-        if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VENC_DestroyChn(main) failed: %#x", ret);
+        if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VENC_DestroyChn(main) failed: %#x", ret);
         venc_created_[kVencMainChn] = false;
     }
     if (venc_created_[kVencSubChn]) {
         ret = RK_MPI_VENC_DestroyChn(kVencSubChn);
-        if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VENC_DestroyChn(sub) failed: %#x", ret);
+        if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VENC_DestroyChn(sub) failed: %#x", ret);
         venc_created_[kVencSubChn] = false;
     }
     if (venc_created_[kVencMjpegChn]) {
         ret = RK_MPI_VENC_DestroyChn(kVencMjpegChn);
-        if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VENC_DestroyChn(mjpeg) failed: %#x", ret);
+        if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VENC_DestroyChn(mjpeg) failed: %#x", ret);
         venc_created_[kVencMjpegChn] = false;
     }
     return 0;
@@ -331,15 +331,15 @@ int RvVideoPipeline::deinit_venc_channels() {
 
 int RvVideoPipeline::deinit_vi_channels() {
     int ret = RK_MPI_VI_DisableChn(kPipeId, kViMainChn);
-    if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VI_DisableChn(main) failed: %#x", ret);
+    if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VI_DisableChn(main) failed: %#x", ret);
     ret = RK_MPI_VI_DisableChn(kPipeId, kViSubChn);
-    if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VI_DisableChn(sub) failed: %#x", ret);
+    if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VI_DisableChn(sub) failed: %#x", ret);
     return 0;
 }
 
 int RvVideoPipeline::deinit_vi_dev() {
     int ret = RK_MPI_VI_DisableDev(kDevId);
-    if (ret != RK_SUCCESS) LOGGER_WARN(HIMPP, "RK_MPI_VI_DisableDev failed: %#x", ret);
+    if (ret != RK_SUCCESS) LOGGER_WARN(ROCKIT, "RK_MPI_VI_DisableDev failed: %#x", ret);
     return 0;
 }
 
