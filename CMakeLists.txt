@@ -90,6 +90,7 @@ file(REMOVE_RECURSE "${CMAKE_INSTALL_PREFIX}")
 
 if(TARGET_PLATFORM STREQUAL "rv1126b")
     set(FILTERED_SOS "")
+    install(PROGRAMS ${CMAKE_SOURCE_DIR}/scripts/rk_dumpsys_compat.sh DESTINATION bin RENAME rk_dumpsys)
 else()
     file(GLOB_RECURSE THIRD_PARTY_SOS "${CMAKE_SOURCE_DIR}/thirdparty/*.so*")
     set(FILTERED_SOS "")

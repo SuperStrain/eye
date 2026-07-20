@@ -39,3 +39,9 @@
 
 - Hi3516CV610 的 MPP 头/库来自 `thirdparty/hi3516cv610_mpp/`，zlog 来自 `thirdparty/zlog/`；RV1126B 的 `librockit` 等运行时库来自交叉编译 sysroot（`toolchain-rv1126b.cmake` 自动探测的 `CMAKE_SYSROOT`），不在仓库 `thirdparty` 内。
 - Hi3516CV610 构建时安装阶段会复制 `thirdparty` 下除 `hi3516cv610_mpp`/`rv1126b_mpp` 目录外的 `.so*` 到 `lib/`；RV1126B 构建时 `.so` 列表置空，运行时库由 SDK rootfs 提供，安装不复制。MPP `.so` 不会被安装规则复制。
+
+## RV1126B dumpsys 已知问题
+
+- SDK 内 `external/rockit`（用户态 `librockit.so` + `dumpsys`，Dec 15 / `git-5057bd373`）与 `external/ipc_drv_ko`（内核 `rockit-ko`，Dec 30 / `v2.48.0`）版本错配 15 天；DumpSys 系列 ioctl 协议在此期间演进，导致 `/usr/bin/dumpsys` 经由 eye 内置 `ipcs_server`（TCP `127.0.0.1:3893`）查询内核状态时全部返回空。表现为 `dumpsys venc` 输出仅头/尾、`dumpsys sys` 绑定表为空、`dumpsys vi` 计数器全为 0。eye 主体功能（VI/VENC/Bind/GetStream）不受影响。
+- 临时替代工具：`scripts/rk_dumpsys_compat.sh`，直接读 `/dev/mpi/vsys`、`/dev/mpi/valloc`、`/dev/mpi/venc`，可显示绑定关系、节点帧计数、MB 分配、连续 fps 采样。详见 `docs/rv1126b-dumpsys-blank-output.md`。
+- 根修复需向 Rockchip/Alientek 索取与 `external/ipc_drv_ko` 同源（commit `9ca741946f...`，v2.48.0）的 `librockit.so` + `dumpsys`，替换后 `dumpsys venc` 应能完整输出。未拿到匹配二进制前，不要替换 `/usr/lib/librockit.so` 或降级 `/usr/lib/module/rockit*.ko`，会破坏 eye 当前正常工作的视频流。
