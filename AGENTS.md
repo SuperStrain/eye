@@ -6,8 +6,9 @@
 - Hi3516CV610 工具链前缀 `arm-v01c02-linux-musleabi-`，配置在 `cmake/toolchain-arm-v01c02.cmake`，CPU flags：`-mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4`。
 - RV1126B 工具链前缀 `aarch64-buildroot-linux-gnu-`，配置在 `cmake/toolchain-rv1126b.cmake`；该文件不硬编码任何绝对路径——编译器只用前缀（依赖 PATH 查找工具链 bin），`CMAKE_SYSROOT` 通过 `gcc --print-sysroot` 自动探测（可用 `-DCMAKE_SYSROOT=...` 手动覆盖）；未设专用 CPU flags（通用 aarch64）。构建前提是 PATH 已包含工具链 bin 目录。
 - CMake 必须显式带 toolchain；根 `CMakeLists.txt` 未设置 `CMAKE_TOOLCHAIN_FILE` 会直接 `FATAL_ERROR`。
-- 标准构建顺序：`cd build && ./set.sh && make && cmake --install .`。
-- `build/set.sh [hi3516cv610|rv1126b]` 按平台选择对应 toolchain（默认 `hi3516cv610`），会先执行 `build/clean.sh` 清掉 `build/` 内除 `.sh` 外的文件，再用 Release 配置 CMake。
+- 标准构建顺序：`make`（默认 Release，`-O2`）或 `make debug`（`-O0 -g`，perf/gdb 调试用），再 `make install`；构建入口是仓库根 `Makefile`。
+- `Makefile` 封装 cmake 配置/编译/安装，构建目录按「平台-类型」分离：`build/hi3516cv610-release/`、`build/hi3516cv610-debug/`、`build/rv1126b-release/`、`build/rv1126b-debug/`；支持 `TARGET_PLATFORM=rv1126b make [debug]` 切换平台。`make clean` 清当前配置目录，`make distclean` 清所有 build 目录。
+- Release 与 Debug 均保留符号表（`CMakeLists.txt` 不再用链接 `-s` strip），便于设备侧 `perf top -p` 解析函数名；如需最小体积可手动 `arm-v01c02-linux-musleabi-strip eye`。
 - 默认安装目录是 `$HOME/eyeOut/${TARGET_PLATFORM}`（如 `$HOME/eyeOut/hi3516cv610`）；安装前根 `CMakeLists.txt` 会 `file(REMOVE_RECURSE "${CMAKE_INSTALL_PREFIX}")`，清理只作用于当前平台子目录，不影响其他平台产物。不要把安装前缀指向需要保留的目录。
 - `ENABLE_PEDANTIC=ON` 只额外加 `-Wpedantic`；没有独立 lint/format/test runner 配置。
 
