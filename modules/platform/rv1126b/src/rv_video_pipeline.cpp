@@ -21,15 +21,19 @@ constexpr int kViSubChn = 2;
 constexpr int kVencMainChn = 0;
 constexpr int kVencSubChn = 1;
 constexpr int kVencMjpegChn = 2;
-constexpr int kMainWidth = 2688;
-constexpr int kMainHeight = 1520;
-constexpr int kSubWidth = 640;
-constexpr int kSubHeight = 480;
-constexpr int kMjpegWidth = 640;
-constexpr int kMjpegHeight = 480;
+// 视频参数对应 IMX415 mode[0]：sensor native 3864x2192@30fps 10bit Linear（NO_HDR），
+// 由 rockit 默认协商，无需应用层显式设置（与官方 test_mpi_vi.cpp 流程一致）。
+// 主码流 stSize = sensor native，ISP 无缩放；子码流/MJPEG 由 ISP 下采样。
+// 详见 atk_dlrv1126b_linux6.1_sdk/kernel-6.1/drivers/media/i2c/imx415.c supported_modes[0]。
+constexpr int kMainWidth = 3864;
+constexpr int kMainHeight = 2192;
+constexpr int kSubWidth = 1280;
+constexpr int kSubHeight = 720;
+constexpr int kMjpegWidth = 1280;
+constexpr int kMjpegHeight = 720;
 constexpr int kFrameRate = 30;
-constexpr int kMainBitrate = 4096;
-constexpr int kSubBitrate = 1024;
+constexpr int kMainBitrate = 8192;
+constexpr int kSubBitrate = 2048;
 constexpr int kMjpegBitrate = 2048;
 
 } // namespace
