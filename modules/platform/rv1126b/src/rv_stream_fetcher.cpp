@@ -73,8 +73,8 @@ int RvStreamFetcher::fetchFrame(VencChannel chn, FrameData& frame) {
     }
 
     frame.pack_count = 1;
-    frame.seq = 0;
-    frame.packs[0].data = static_cast<const uint8_t*>(data);
+    frame.seq = stream.u32Seq;
+    frame.packs[0].data = static_cast<const uint8_t*>(data) + pack.u32Offset;
     frame.packs[0].len = pack.u32Len;
     frame.packs[0].nalu_type = map_nalu_type(codec_type_, pack);
 

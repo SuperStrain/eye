@@ -16,7 +16,8 @@ RtspStreamSource::RtspStreamSource(
       frame_queue_(queue),
       stream_type_(type),
       codec_type_(codec),
-      awaiting_frame_(false) {
+      awaiting_frame_(false),
+      waiting_for_idr_(true) {
     if (frame_queue_) {
         frame_queue_->register_source(this);
     }
@@ -35,6 +36,7 @@ void RtspStreamSource::doGetNextFrame() {
 
 void RtspStreamSource::doStopGettingFrames() {
     awaiting_frame_ = false;
+    waiting_for_idr_ = true;
     FramedSource::doStopGettingFrames();
 }
 
@@ -52,9 +54,15 @@ void RtspStreamSource::deliver_frame(RtspStreamSource* source) {
     }
 
     RtspNalUnit nal;
-    if (!source->frame_queue_->pop_nal_unit(nal)) {
-        source->awaiting_frame_ = true;
-        return;
+    for (;;) {
+        if (!source->frame_queue_->pop_nal_unit(nal)) {
+            source->awaiting_frame_ = true;
+            return;
+        }
+        if (!source->waiting_for_idr_ || nal.is_idr) {
+            source->waiting_for_idr_ = false;
+            break;
+        }
     }
 
     if (nal.data.size() > source->fMaxSize) {
@@ -73,13 +81,11 @@ void RtspStreamSource::deliver_frame(RtspStreamSource* source) {
         memcpy(source->fTo, nal.data.data(), nal.data.size());
     }
 
-    static const uint32_t kDefaultFps = 30;
     source->fPresentationTime.tv_sec =
         static_cast<time_t>(nal.timestamp / 1000);
     source->fPresentationTime.tv_usec =
         static_cast<suseconds_t>((nal.timestamp % 1000) * 1000);
-    source->fDurationInMicroseconds =
-        static_cast<unsigned>(1000000 / kDefaultFps);
+    source->fDurationInMicroseconds = 0;
 
     FramedSource::afterGetting(source);
 }

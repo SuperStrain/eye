@@ -32,6 +32,7 @@ private:
     StreamType stream_type_;
     CodecType codec_type_;
     bool awaiting_frame_;
+    bool waiting_for_idr_;
 };
 
 #endif
