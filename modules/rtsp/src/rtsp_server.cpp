@@ -6,7 +6,10 @@
 #include "stream_frame.h"
 
 #include <BasicUsageEnvironment.hh>
+#include <MediaSink.hh>
 #include <RTSPServer.hh>
+
+static const unsigned kRtspOutputBufferSize = 1024 * 1024;
 
 RtspServer& RtspServer::instance() {
     static RtspServer inst;
@@ -37,6 +40,7 @@ bool RtspServer::start(uint16_t port) {
     }
 
     config_.port = port;
+    OutPacketBuffer::increaseMaxSizeTo(kRtspOutputBufferSize);
 
     scheduler_ = BasicTaskScheduler::createNew();
     if (!scheduler_) {
