@@ -25,6 +25,9 @@ constexpr int kMjpegFrameRate = 10;
 
 constexpr char kAppSinkNames[][16] = {"app_main", "app_sub", "app_mjpeg"};
 
+// live 源（v4l2src）的状态切换是异步的，等待其完成的上限。
+const GstClockTime kStateChangeTimeout = 5 * GST_SECOND;
+
 std::string build_pipeline_desc() {
     char buf[1024];
     std::snprintf(buf, sizeof(buf),
@@ -97,6 +100,14 @@ int GstVideoPipeline::init() {
         return -1;
     }
 
+    GstState state;
+    ret = gst_element_get_state(pipeline_, &state, nullptr, kStateChangeTimeout);
+    if (ret == GST_STATE_CHANGE_FAILURE || ret == GST_STATE_CHANGE_ASYNC) {
+        LOGGER_ERROR(GST, "pipeline failed to reach PAUSED (state change %d)", ret);
+        deinit();
+        return -1;
+    }
+
     initialized_ = true;
     LOGGER_INFO(GST, "RV1126B GStreamer pipeline initialized");
     return 0;
@@ -118,6 +129,13 @@ int GstVideoPipeline::start() {
     GstStateChangeReturn ret = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {
         LOGGER_ERROR(GST, "pipeline failed to reach PLAYING");
+        return -1;
+    }
+
+    GstState state;
+    ret = gst_element_get_state(pipeline_, &state, nullptr, kStateChangeTimeout);
+    if (ret == GST_STATE_CHANGE_FAILURE || ret == GST_STATE_CHANGE_ASYNC) {
+        LOGGER_ERROR(GST, "pipeline failed to reach PLAYING (state change %d)", ret);
         return -1;
     }
     return 0;
