@@ -12,6 +12,7 @@
 #define LOG_CATEGORY_LIST \
     X(HIMPP)              \
     X(ROCKIT)             \
+    X(GST)                \
     X(TEST)               \
     X(STREAM)             \
     X(RTSP)

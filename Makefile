@@ -1,4 +1,5 @@
 TARGET_PLATFORM ?= hi3516cv610
+USE_GSTREAMER ?= OFF
 
 ifeq ($(TARGET_PLATFORM),hi3516cv610)
   TOOLCHAIN := cmake/toolchain-arm-v01c02.cmake
@@ -22,6 +23,7 @@ BUILD_DIR := build/$(TARGET_PLATFORM)-$(shell echo $(BUILD_TYPE) | tr A-Z a-z)
 CMAKE_CFG := cmake -S . -B $(BUILD_DIR) \
     -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) \
     -DTARGET_PLATFORM=$(TARGET_PLATFORM) \
+    -DUSE_GSTREAMER=$(USE_GSTREAMER) \
     -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 
 NJOBS ?= $(shell nproc)
@@ -61,6 +63,7 @@ help:
 	@echo "  make distclean          清所有 build 目录"
 	@echo "变量："
 	@echo "  TARGET_PLATFORM=hi3516cv610|rv1126b   (默认 hi3516cv610)"
+	@echo "  USE_GSTREAMER=ON                        rv1126b 用 GStreamer 后端（默认 OFF=rockit）"
 	@echo "  NJOBS=N                               编译并行度（默认 nproc=$(NJOBS)）"
 	@echo "  -jN                                    命令行 -jN 经 jobserver 控制编译并行度"
 	@echo "  组合示例：make debug install -j4 TARGET_PLATFORM=rv1126b"
