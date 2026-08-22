@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <pthread.h>
+#include <unistd.h>
 
 namespace rv1126bMedia {
 
@@ -93,7 +94,9 @@ void GstStreamFetcher::run() {
     LOGGER_INFO(STREAM, "GStreamer fetcher ch%d running", static_cast<int>(channel_));
     while (running_) {
         FrameData frame;
-        fetchFrame(channel_, frame);  // 失败即 100ms 超时，继续循环
+        if (fetchFrame(channel_, frame) != 0) {
+            usleep(10 * 1000);  // EOS/错误时 try_pull 立即返回，退避避免空转
+        }
     }
     LOGGER_INFO(STREAM, "GStreamer fetcher ch%d stopped", static_cast<int>(channel_));
 }
