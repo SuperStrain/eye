@@ -82,6 +82,16 @@ Chn2=子（同时广播给 CHN1/CHN2）。
   - `gop`：GOP 帧数（-1=跟随 fps）
   - `bps-min` / `bps-max`、`width` / `height`、`header-mode`（默认首帧含头）等
 
+- 设备侧已实测可用的 v4l2→MPP 推流命令（用户提供）：
+  ```
+  v4l2src device=/dev/video-camera0 io-mode=mmap ! \
+  video/x-raw,format=NV16,width=3840,height=2160,framerate=30/1 ! \
+  mpph264enc ! h264parse ! rtph264pay pt=96
+  ```
+  关键结论：v4l2 节点为 `/dev/video-camera0`，输出 **NV16 3840×2160@30**（非 rockit 的 3864×2192），
+  `v4l2src` 需 `io-mode=mmap`，`mpph264enc` 可直接接受 NV16 输入。`mpph265enc`/`mppjpegenc` 与
+  `mpph264enc` 同源（`gstmppenc`），预期可用，需设备侧各验证一次。
+
 ### 3.4 构建系统（现状）
 
 - 根 `Makefile`：`TARGET_PLATFORM=rv1126b make [debug] [install]`，build 目录
@@ -96,13 +106,13 @@ Chn2=子（同时广播给 CHN1/CHN2）。
 |---|---|---|
 | 后端选择机制 | CMake 选项 `USE_GSTREAMER`（默认 OFF=rockit）+ 编译宏 `USE_GSTREAMER=1` | 用户指定；默认 OFF 不破坏现有 rockit 构建 |
 | 代码结构 | 双后端类 + 宏分发工厂（方案①） | rockit 零改动、各自独立可测、无 `#ifdef` 汤 |
-| GStreamer 管线 | `v4l2src → tee → 3 分支 → mpp 编码器 → parse → appsink` | 单 sensor 源扇出，硬编，appsink 拉流复用现有消费链 |
+| GStreamer 管线 | `v4l2src(/dev/video-camera0, NV16 3840×2160) → tee → 3 分支 → mpp 编码器 → parse → appsink` | 单 sensor 源扇出，硬编，appsink 拉流复用现有消费链 |
 | 帧粒度 | `h264parse/h265parse` + `stream-format=byte-stream,alignment=au` | 保证每 buffer=一帧 Annex-B，对齐 RTSP 拆 NAL |
 | 关键帧判定 | `GST_BUFFER_FLAG_DELTA_UNIT`（无此 flag=IDR） | 与 parse 元素配合可靠，等价 rockit 的 IDR 映射 |
 | MJPEG 路 | `mppjpegenc → appsink`（`image/jpeg`） | 无 NAL 语义，`is_idr()` 恒真，与 rockit 一致 |
 | RTSP 层 | 保留现有 Live555 + StreamDistributor | 用户指定；改动最小 |
 | 日志分类 | 新增 `GST`（`logger.h` 一行） | 与 `ROCKIT` 对称；zlog 通配规则自动覆盖 |
-| sysroot | 按后端显式选 sysroot（见 §5.4） | rockit/GStreamer 所需库在不同 sysroot |
+| 依赖库 | 按后端在 sysroot 内检测所需库，缺失即报错（见 §5.5） | 不硬编码 sysroot 路径，靠检测给出清晰报错 |
 
 ## 5. 详细设计
 
@@ -174,8 +184,8 @@ std::unique_ptr<IStreamProvider> create_stream_fetcher(
 管线字符串（常量，含注释）：
 
 ```
-v4l2src device=/dev/video0 ! \
-  video/x-raw,format=NV12,width=3864,height=2192,framerate=30/1 ! tee name=t
+v4l2src device=/dev/video-camera0 io-mode=mmap ! \
+  video/x-raw,format=NV16,width=3840,height=2160,framerate=30/1 ! tee name=t
 t. ! queue ! mpph265enc rc-mode=cbr bps=8192000 gop=60 ! \
   h265parse ! video/x-h265,stream-format=byte-stream,alignment=au ! appsink name=app_main
 t. ! queue ! videoscale ! video/x-raw,width=1280,height=720 ! \
@@ -197,7 +207,12 @@ appsink ↔ `VencChannel` 映射（`app_sink(channel)` 据此返回）：
 - `appsink` 关闭 signal 派发（`emit-signals=false`），改用 `gst_app_sink_pull_sample` 主动拉流。
 - `queue` 用于 tee 分支解耦、避免跨分支阻塞。
 - MJPEG 分支用 `videorate` 降到 10fps，与 rockit 的 `fr32DstFrameRateNum=10` 对齐。
-- v4l2 设备节点 / NV12 / 分辨率 / 帧率做成常量（匿名命名空间），默认 `/dev/video0`，设备侧可调。
+- v4l2 节点 / NV16 / 分辨率 / 帧率做成常量（匿名命名空间），默认 `/dev/video-camera0`、NV16、
+  3840×2160@30（来自用户实测命令）。
+- 主码流分辨率 3840×2160（v4l2 暴露的 4K crop）与 rockit 主码流 3864×2192（sensor native 全读出）
+  略有差异，属 v4l2 路径固有，接受之；如需严格一致另行在 capsfilter 裁剪。
+- 子/MJPEG 分支 `videoscale` 会把 NV16 缩到 720p（必要时内部做格式转换）；若某编码器对 NV16 输入
+  有兼容问题，则在该分支前加 `videoconvert ! video/x-raw,format=NV12` 兜底。
 
 ### 5.4 `GstStreamFetcher`（新增）
 
@@ -240,13 +255,15 @@ if(USE_GSTREAMER)
         PRIVATE ${GST_LIBRARIES} pthread)
     target_compile_definitions(platform_impl PUBLIC PLATFORM_RV1126B=1 USE_GSTREAMER=1)
 else()
+    find_path(ROCKIT_INCLUDE_DIR rk_mpi_sys.h REQUIRED)
+    find_library(ROCKIT_LIBRARY rockit REQUIRED)
     add_library(platform_impl STATIC
         src/rv_video_pipeline.cpp
         src/rv_stream_fetcher.cpp
         src/rv_platform_factory.cpp)
     target_include_directories(platform_impl PUBLIC
-        include ${CMAKE_SOURCE_DIR}/modules/stream/include)
-    target_link_libraries(platform_impl PUBLIC interface PRIVATE rockit pthread)
+        include ${CMAKE_SOURCE_DIR}/modules/stream/include ${ROCKIT_INCLUDE_DIR})
+    target_link_libraries(platform_impl PUBLIC interface PRIVATE ${ROCKIT_LIBRARY} pthread)
     target_compile_definitions(platform_impl PUBLIC PLATFORM_RV1126B=1)
 endif()
 ```
@@ -257,17 +274,17 @@ endif()
 - `CMAKE_CFG` 追加 `-DUSE_GSTREAMER=$(USE_GSTREAMER)`。
 - `help` 补充说明：`USE_GSTREAMER=ON TARGET_PLATFORM=rv1126b make`。
 
-**sysroot 按后端选择**：`toolchain-rv1126b.cmake` 靠 `gcc --print-sysroot` 探测，因此构建前必须
-让 PATH 中的 `aarch64-buildroot-linux-gnu-gcc` 指向对应 SDK：
+**依赖库检测（不硬编码 sysroot）**：`toolchain-rv1126b.cmake` 靠 `gcc --print-sysroot` 探测 sysroot，
+构建时按所选后端在 sysroot 内检测所需库，缺失即 configure 失败并给出清晰报错：
 
-| 后端 | 所需 sysroot 内容 | 来源 |
-|---|---|---|
-| rockit（OFF） | `librockit` + `rk_mpi_*.h` | `buildroot/output/alientek_rv1126b_ipc/host` 的 SDK |
-| GStreamer（ON） | `gstreamer-1.0`/`gstreamer-app-1.0`/glib | `/opt/aarch64-buildroot-linux-gnu_sdk-buildroot` 或 eye buildroot 的 host SDK |
+- GStreamer（ON）：`pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-app-1.0)` —— 找不到直接
+  报“缺少 GStreamer 开发库，请切换到含 GStreamer 的 SDK”。
+- rockit（OFF）：`find_path(ROCKIT_INCLUDE_DIR rk_mpi_sys.h REQUIRED)` +
+  `find_library(ROCKIT_LIBRARY rockit REQUIRED)` —— 找不到直接报“缺少 librockit，请切换到含 rockit 的 SDK”。
 
-实现阶段在 `Makefile`/文档里写清该前提（不强行在 toolchain 里硬编码绝对路径，保持现有“靠 PATH”
-约定）。`pkg-config` 交叉编译需确认 `PKG_CONFIG_SYSROOT_DIR`/`PKG_CONFIG_PATH` 解析到 sysroot 的
-`.pc`（CMake 的 `pkg_check_modules` 配合 `CMAKE_SYSROOT` 处理，实现时验证）。
+即：构建前只需让 PATH 中的 `aarch64-buildroot-linux-gnu-gcc` 对应所需 SDK，无需在 CMake/工具链里
+写死任何绝对路径。`pkg-config` 交叉编译需确认 `PKG_CONFIG_SYSROOT_DIR`/`PKG_CONFIG_PATH` 解析到
+sysroot 的 `.pc`（CMake 的 `pkg_check_modules` 配合 `CMAKE_SYSROOT` 处理，实现时验证）。
 
 ### 5.6 日志分类（`logger.h`）
 
@@ -286,19 +303,18 @@ zlog 通配规则（`*.=INFO` 等）自动覆盖，无需改 `conf/zlog.conf`。
 
 | 严重度 | 风险 | 缓解 |
 |---|---|---|
-| 高 | v4l2 节点 / NV12 caps / 3864×2192 实际输出未在设备核实 | 做成常量，设备侧 `v4l2-ctl --list-formats -d /dev/videoX` 确认后仅改常量 |
-| 中 | `videoscale` 两路 CPU 缩放（8MP→720p）占用 CPU | 首版保底；后续换 ISP selfpath 第二路或 `rockchipmpp` 缩放 |
-| 中 | mpp 编码器属性单位/取值（`bps` bit/s、`rc-mode` 字符串）与 MPP 版本耦合 | 已核实插件源码；实现时用 `gst-launch-1.0` 先串命令验证管线再落码 |
-| 中 | 双 sysroot 导致后端切换易错 | 在 `Makefile` help 与 spec 中明确；可选加构建前 `--print-sysroot` 校验提示 |
+| 中 | 子/MJPEG 分支缩放 + 格式转换路径未实测（源 NV16 3840×2160，仅主路 h264 实测通过） | 实现时用 `gst-launch-1.0` 逐分支串命令验证；必要时 `videoconvert` 兜底 |
+| 中 | `videoscale` 两路 CPU 缩放（4K→720p）占用 CPU | 首版保底；后续换 ISP selfpath 第二路或 `rockchipmpp` 缩放 |
+| 低 | mpp 编码器属性单位/取值（`bps` bit/s、`rc-mode` 字符串）与 MPP 版本耦合 | 已核实插件源码 + 用户实测 `mpph264enc` 可用；实现时先串命令验证再落码 |
+| 低 | 依赖库检测失败时报错不够清晰 | `pkg_check_modules(REQUIRED)` / `find_path`+`find_library(REQUIRED)` 失败即停，报错写清缺哪套 SDK |
 | 低 | `pkg-config` 交叉编译解析不到 sysroot `.pc` | 实现时验证，必要时设 `PKG_CONFIG_SYSROOT_DIR`/`PKG_CONFIG_PATH` |
 | 低 | RTSP 起播花屏（需首帧含 SPS/PPS + IDR） | `h264parse/h265parse` 默认 header-mode=首帧含头，mpp 编码器默认同；与已修的 RTSP IDR-start 兼容 |
 
 ## 8. 待确认项
 
-- **v4l2 设备节点与 caps**：IMX415 经 rkisp 的 `/dev/videoX` 主路径节点、支持的 NV12 格式/尺寸，
-  需在设备上确认。
-- **rockit 当前构建实际使用的工具链 PATH / sysroot**：实现“sysroot 按后端选择”时与用户对齐。
-- **8MP@30 硬编 + 两路缩放的实际负载**：设备侧 `perf top`/帧率观察（rockit 版 §8 已有同类项）。
+- **子/MJPEG 分支缩放与格式转换**：源 NV16 3840×2160 缩到 1280×720 是否需 `videoconvert` 兜底，
+  实现时在设备上逐分支验证。
+- **4K@30 硬编 + 两路缩放的实际负载**：设备侧 `perf top`/帧率观察（rockit 版 §8 已有同类项）。
 
 ## 9. 验证步骤
 
@@ -312,7 +328,7 @@ zlog 通配规则（`*.=INFO` 等）自动覆盖，无需改 `conf/zlog.conf`。
 设备侧（GStreamer 后端部署到 eye 固件）：
 
 1. 运行 `/app/bin/eye`，确认 GStreamer 初始化日志（`GST` 分类）成功、三路 appsink 到位、管线 PLAYING。
-2. RTSP 拉流 `ffprobe rtsp://<ip>:8554/main`、`/sub`：主码流 H265 3864×2192@30、子码流 H264 1280×720@30，
+2. RTSP 拉流 `ffprobe rtsp://<ip>:8554/main`、`/sub`：主码流 H265 3840×2160@30、子码流 H264 1280×720@30，
    起播无花屏。
 3. `stream_test()` 产物 `/run/stream_chn0.h265`、`/run/stream_chn1.h264`、`/run/stream_chn2.mjpeg`
    可被 `ffprobe` 解析。
