@@ -28,6 +28,56 @@ constexpr char kAppSinkNames[][16] = {"app_main", "app_sub", "app_mjpeg"};
 // live 源（v4l2src）的状态切换是异步的，等待其完成的上限。
 const GstClockTime kStateChangeTimeout = 5 * GST_SECOND;
 
+// 运行期错误/警告/EOS/状态迁移经 bus 同步回调打到日志。本应用无 GMainLoop，
+// 故用 gst_bus_set_sync_handler（在投递线程内同步执行）而非 gst_bus_add_watch。
+GstBusSyncReply bus_sync_handler(GstBus*, GstMessage* msg, gpointer user_data) {
+    GstElement* pipeline = static_cast<GstElement*>(user_data);
+    const char* src = GST_MESSAGE_SRC(msg) ? GST_OBJECT_NAME(GST_MESSAGE_SRC(msg)) : "(null)";
+
+    switch (GST_MESSAGE_TYPE(msg)) {
+        case GST_MESSAGE_ERROR: {
+            GError* err = nullptr;
+            gchar* debug = nullptr;
+            gst_message_parse_error(msg, &err, &debug);
+            LOGGER_ERROR(GST, "bus ERROR from %s: %s (%s)",
+                         src, err ? err->message : "unknown", debug ? debug : "");
+            g_error_free(err);
+            g_free(debug);
+            break;
+        }
+        case GST_MESSAGE_WARNING: {
+            GError* err = nullptr;
+            gchar* debug = nullptr;
+            gst_message_parse_warning(msg, &err, &debug);
+            LOGGER_WARN(GST, "bus WARNING from %s: %s (%s)",
+                        src, err ? err->message : "unknown", debug ? debug : "");
+            g_error_free(err);
+            g_free(debug);
+            break;
+        }
+        case GST_MESSAGE_EOS: {
+            LOGGER_WARN(GST, "bus EOS from %s", src);
+            break;
+        }
+        case GST_MESSAGE_STATE_CHANGED: {
+            // 只打印顶层 pipeline 的状态迁移，避免每个元素刷屏。
+            if (pipeline && GST_MESSAGE_SRC(msg) == GST_OBJECT(pipeline)) {
+                GstState old_state = GST_STATE_NULL;
+                GstState new_state = GST_STATE_NULL;
+                GstState pending = GST_STATE_NULL;
+                gst_message_parse_state_changed(msg, &old_state, &new_state, &pending);
+                LOGGER_DEBUG(GST, "pipeline state: %s -> %s",
+                             gst_element_state_get_name(old_state),
+                             gst_element_state_get_name(new_state));
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    return GST_BUS_PASS;
+}
+
 std::string build_pipeline_desc() {
     char buf[1024];
     std::snprintf(buf, sizeof(buf),
@@ -81,6 +131,13 @@ int GstVideoPipeline::init() {
         return -1;
     }
 
+    // 挂 bus 同步处理器：运行期错误/警告/EOS/状态迁移打到日志（便于设备侧定位）。
+    GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline_));
+    if (bus) {
+        gst_bus_set_sync_handler(bus, bus_sync_handler, pipeline_, nullptr);
+        gst_object_unref(bus);
+    }
+
     for (int i = 0; i < 3; ++i) {
         GstElement* sink = gst_bin_get_by_name(GST_BIN(pipeline_), kAppSinkNames[i]);
         if (!sink) {
@@ -90,6 +147,7 @@ int GstVideoPipeline::init() {
         }
         app_sinks_[i] = GST_APP_SINK(sink);
         gst_object_unref(sink);  // 归还 get_by_name 的引用，pipeline 仍持有元素
+        LOGGER_INFO(GST, "appsink %s acquired", kAppSinkNames[i]);
     }
 
     // 到 PAUSED 验证所有元素可加载/可协商；真正 PLAYING 由 start() 触发（首个 fetcher 调用）。
@@ -109,6 +167,7 @@ int GstVideoPipeline::init() {
     }
 
     initialized_ = true;
+    LOGGER_INFO(GST, "pipeline reached %s", gst_element_state_get_name(state));
     LOGGER_INFO(GST, "RV1126B GStreamer pipeline initialized");
     return 0;
 }
@@ -121,6 +180,7 @@ int GstVideoPipeline::deinit() {
     }
     std::memset(app_sinks_, 0, sizeof(app_sinks_));
     initialized_ = false;
+    LOGGER_INFO(GST, "RV1126B GStreamer pipeline deinitialized");
     return 0;
 }
 
@@ -138,6 +198,7 @@ int GstVideoPipeline::start() {
         LOGGER_ERROR(GST, "pipeline failed to reach PLAYING (state change %d)", ret);
         return -1;
     }
+    LOGGER_INFO(GST, "pipeline reached PLAYING");
     return 0;
 }
 

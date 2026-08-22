@@ -22,7 +22,8 @@ GstStreamFetcher::GstStreamFetcher(VencChannel chn, StreamType type, CodecType c
                                    StreamDistributor& distributor)
     : channel_(chn), stream_type_(type), codec_type_(codec), distributor_(distributor),
       app_sink_(GstVideoPipeline::getInstance().app_sink(chn)),
-      seq_(0), running_(false) {}
+      seq_(0), frame_count_(0), bytes_total_(0), idr_count_(0),
+      eos_reported_(false), running_(false) {}
 
 GstStreamFetcher::~GstStreamFetcher() { stop(); }
 
@@ -48,7 +49,15 @@ int GstStreamFetcher::fetchFrame(VencChannel chn, FrameData& frame) {
     if (!app_sink_) return -1;
 
     GstSample* sample = gst_app_sink_try_pull_sample(app_sink_, 100 * GST_MSECOND);
-    if (!sample) return -1;  // 100ms 超时，run() 里继续检查 running_
+    if (!sample) {
+        // 区分：普通 100ms 超时（静默）vs EOS（管线结束，首次告警避免刷屏）。
+        if (!eos_reported_ && gst_app_sink_is_eos(app_sink_)) {
+            eos_reported_ = true;
+            LOGGER_WARN(STREAM, "GStreamer fetcher ch%d: appsink EOS (pipeline ended)",
+                        static_cast<int>(channel_));
+        }
+        return -1;
+    }
 
     GstBuffer* buffer = gst_sample_get_buffer(sample);
     if (!buffer) {
@@ -72,6 +81,16 @@ int GstStreamFetcher::fetchFrame(VencChannel chn, FrameData& frame) {
         frame.packs[0].nalu_type = is_keyframe(buffer) ? NaluType::IDR_SLICE : NaluType::P_SLICE;
     }
 
+    // 统计：帧数/字节/关键帧（MJPEG 无 IDR 概念，不计关键帧）。
+    const size_t frame_bytes = map.size;
+    bool idr = false;
+    if (codec_type_ != CodecType::MJPEG) {
+        idr = (frame.packs[0].nalu_type == NaluType::IDR_SLICE);
+        if (idr) idr_count_++;
+    }
+    frame_count_++;
+    bytes_total_ += frame_bytes;
+
     // StreamFrame 构造时深拷贝；随后立即 unmap/unref，不把 GStreamer 缓冲指针带出构造。
     auto stream_frame = std::make_shared<StreamFrame>(channel_, stream_type_, codec_type_, frame);
 
@@ -79,6 +98,18 @@ int GstStreamFetcher::fetchFrame(VencChannel chn, FrameData& frame) {
     gst_sample_unref(sample);
 
     distributor_.push(stream_frame);
+
+    if (frame_count_ == 1) {
+        const char* kind = (codec_type_ == CodecType::MJPEG) ? "MJPEG" : (idr ? "IDR" : "P");
+        LOGGER_INFO(STREAM, "GStreamer fetcher ch%d: first frame %zu bytes (%s)",
+                    static_cast<int>(channel_), frame_bytes, kind);
+    } else if (frame_count_ % 100 == 0) {
+        LOGGER_INFO(STREAM, "GStreamer fetcher ch%d: frames=%llu bytes=%llu idr=%llu",
+                    static_cast<int>(channel_),
+                    (unsigned long long)frame_count_,
+                    (unsigned long long)bytes_total_,
+                    (unsigned long long)idr_count_);
+    }
     return 0;
 }
 

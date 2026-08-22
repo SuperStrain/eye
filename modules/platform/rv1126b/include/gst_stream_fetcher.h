@@ -30,6 +30,10 @@ private:
     StreamDistributor& distributor_;
     GstAppSink* app_sink_;
     uint32_t seq_;
+    uint64_t frame_count_;
+    uint64_t bytes_total_;
+    uint64_t idr_count_;
+    bool eos_reported_;
     std::atomic<bool> running_;
     std::thread thread_;
 };
